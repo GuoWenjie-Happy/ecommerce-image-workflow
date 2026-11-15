@@ -1,0 +1,26 @@
+# Python and private environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+# Build outputs
+dist/
+*.zip
+# Credentials and local state
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+.DS_Store
+Thumbs.db
+# Product and execution data must stay outside this repository
+/产品/
+/参考图/
+/输入/
+/交付/
+/工作文件/
+/projects/
+/project.json
+/local/

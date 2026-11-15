@@ -1,0 +1,27 @@
+description = "Analyze a reference poster and create an original poster in its visual system."
+
+prompt = """
+Use the Poster Style Transfer workflow for this request:
+
+{{args}}
+
+First, locate and read the canonical `SKILL.md` for the `poster-style-transfer` skill. Treat it as the source of truth and read its reference files when needed.
+
+Extract poster grammar, not poster content.
+
+Choose the appropriate mode:
+- Direct generation
+- Style Spec only
+- Variable template
+
+Preserve the reference's visual system, including layout, typography hierarchy, hero mechanism, palette relationships, graphic language, and finish.
+
+Create three lists before producing the result:
+1. Hard lock: essential design rules to preserve
+2. Soft lock: adaptable visual details
+3. Must replace: people, logos, text, products, characters, scenery, and proprietary elements
+
+Create original content for the user's new theme. Do not reproduce distinctive reference content, unique illustrations, logos, or exact wording.
+
+Use the output format and quality checks defined in `SKILL.md`.
+"""
