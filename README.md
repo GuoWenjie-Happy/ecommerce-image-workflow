@@ -6,9 +6,11 @@
 
 解压后将整个 `ecommerce-image-workflow` 文件夹放入宿主的技能目录。Codex通常为 `~/.codex/skills/`；遵循使用者实际环境的技能发现机制。不要把文件夹内文件逐个拆散。无需仓库规则。
 
-包内包含流程、模板、文件脚本和两个MIT依赖。完整制作还需安装 `amazon-white-background` 和 `detail-flow`，来源及能力要求见 `references/dependencies.md`。本ZIP不是四个依赖全部预装的离线包，不会自动下载缺失技能。
+包内包含流程、模板、文件脚本及三份MIT依赖：poster-style-transfer、ecommerce-visual-copywriting和完整ecommerce-image-skills集合（含12个技能）。白底技能amazon-white-background已内置，无需单独安装；完整制作仍需单独安装detail-flow。来源、版本和职责见 [依赖说明](references/dependencies.md)，不会自动下载缺失技能。集合内置不等于执行全部技能，当前流程只调用其中所需的白底技能。
 
-文件工具依赖Python3和Pillow：已有依赖直接复用，缺少时对所选解释器执行 `python -m pip install -r <本技能目录>/scripts/requirements.txt`。技能本身不提供生图账号或服务。
+内置技能也已登记上游来源、仓库内路径和更新定位规则，见 [依赖来源与更新说明](references/dependencies.md)。以后可直接说“更新内置 poster-style-transfer”或“更新内置 ecommerce-visual-copywriting”；执行者据此检查上游并更新本仓库对应 `bundled/` 副本，不自动修改宿主安装副本。
+
+文件工具依赖Python3和Pillow：已有依赖直接复用，缺少时对所选解释器执行 `python -m pip install -r <本技能目录>/scripts/requirements.txt`。集合内白底检查脚本另需NumPy，使用前检查现有环境。技能本身不提供生图账号或服务。
 
 ## 使用
 

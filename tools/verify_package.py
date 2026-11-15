@@ -1,4 +1,6 @@
 import json
+import hashlib
+import importlib.util
 import re
 import subprocess
 import sys
@@ -21,8 +23,19 @@ for path in [root/'SKILL.md', * (root/'references').glob('*.md')]:
     for target in re.findall(r'\]\(([^)]+)\)', content):
         if not target.startswith(('http:', 'https:', '#')):
             assert (path.parent/target.split('#')[0]).is_file(), (path, target)
-for name in ['poster-style-transfer', 'ecommerce-visual-copywriting']:
+for name in ['poster-style-transfer', 'ecommerce-visual-copywriting', 'ecommerce-image-skills']:
     assert (root/'bundled'/name/'LICENSE').is_file()
+upstream_manifest = json.loads((root/'references'/'ecommerce-image-skills-source.json').read_text(encoding='utf-8'))
+upstream_root = root/'bundled'/'ecommerce-image-skills'
+assert re.fullmatch(r'[0-9a-f]{40}', upstream_manifest['commit'])
+upstream_files = {p.relative_to(upstream_root).as_posix(): p for p in upstream_root.rglob('*') if p.is_file()}
+assert not any('.git' in Path(name).parts for name in upstream_files), 'Nested Git metadata'
+assert set(upstream_files) == set(upstream_manifest['files_sha256']), 'Upstream file inventory changed'
+for name, expected_hash in upstream_manifest['files_sha256'].items():
+    assert hashlib.sha256(upstream_files[name].read_bytes()).hexdigest() == expected_hash, name
+assert len(list((upstream_root/'skills').glob('*/SKILL.md'))) == 12
+for name in ('SKILL.md', 'scripts/check_main_image.py', 'scripts/generate.py', 'scripts/online_link.py'):
+    assert (upstream_root/'skills'/'amazon-white-background'/name).is_file(), name
 script = root/'scripts'/'ecom_files.py'
 def run(*args, ok=True):
     result = subprocess.run([sys.executable, str(script), *map(str,args)], capture_output=True, encoding='utf-8')
@@ -46,6 +59,23 @@ with tempfile.TemporaryDirectory() as tmp:
     assert Image.open(base/'detail.jpg').size==(90,250)
     run('count',src,src,'--report',base/'counts.json')
     json.loads((base/'counts.json').read_text(encoding='utf-8'))
+    if importlib.util.find_spec('numpy') is not None:
+        from PIL import ImageDraw
+        checker = upstream_root/'skills'/'amazon-white-background'/'scripts'/'check_main_image.py'
+        fixture = Image.new('RGB', (1000, 1000), 'white')
+        ImageDraw.Draw(fixture).rectangle((65, 65, 934, 934), fill=(80, 80, 80))
+        fixture.save(base/'checker-pass.png')
+        Image.new('RGB', (1000, 1000), 'white').save(base/'checker-fail.png')
+        for filename, expected_code, expected_pass in [('checker-pass.png', 0, True), ('checker-fail.png', 1, False)]:
+            fixture_path = base/filename
+            before = fixture_path.read_bytes()
+            result = subprocess.run([sys.executable, '-X', 'utf8', str(checker), str(fixture_path), '--json'], capture_output=True, encoding='utf-8')
+            assert result.returncode == expected_code, (result.stdout, result.stderr)
+            assert json.loads(result.stdout)['pass'] is expected_pass
+            assert fixture_path.read_bytes() == before, 'Read-only checker changed input'
+        print('PASS: bundled white checker accepts valid geometry, rejects empty canvas and preserves inputs.')
+    else:
+        print('SKIP: bundled white checker runtime checks require NumPy; snapshot checks still run.')
 version = (root/'VERSION').read_text(encoding='utf-8').strip()
 assert re.fullmatch(r'\d+\.\d+\.\d+', version), 'Invalid VERSION'
 if '--build' not in sys.argv:
