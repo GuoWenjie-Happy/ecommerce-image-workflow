@@ -36,7 +36,39 @@
 
 ## 简短用户指令
 
-`使用 $ecommerce-image-workflow，完整制作。商品目录：…；范围：…；参考库：…；项目输出目录：…。`
+完整制作：
+
+```text
+使用 $ecommerce-image-workflow，完整制作商品主图和详情图。
+商品目录：…
+范围：全部产品
+参考库：…
+项目输出目录：…
+```
+
+仅主图：`使用 $ecommerce-image-workflow，仅制作商品主图。`
+
+仅详情：`使用 $ecommerce-image-workflow，仅制作商品详情图。`
+
+两者均执行所选图片类别的必要上游、制作、审核、必要返修与交付，不制作另一类图片。新项目补充上述路径与范围；已有项目提供项目总目录，当前上下文可定位时直接写“继续当前项目”。
+
+### 单独阶段
+
+以下指令只执行指定阶段，不自动补跑有生成副作用的上游阶段。按需补充商品名、图片类别和编号；阶段输入与停止点见 [项目阶段契约](project.md)。
+
+| 阶段 | 简短指令 |
+|---|---|
+| 资料整理 | 使用 $ecommerce-image-workflow，仅整理商品资料，不生图。 |
+| 素材处理 | 使用 $ecommerce-image-workflow，仅制作商品白底和透明底素材。 |
+| 参考分析 | 使用 $ecommerce-image-workflow，仅分析和选择参考，不生图。 |
+| 文案策划 | 使用 $ecommerce-image-workflow，仅策划逐图文案和设计执行卡，不生图。 |
+| 图片制作 | 使用 $ecommerce-image-workflow，使用已有执行卡和已验收素材，仅制作商品图片。 |
+| 仅审核 | 使用 $ecommerce-image-workflow，仅审核现有图片，不返修、不生图。 |
+| 返修 | 使用 $ecommerce-image-workflow，仅返修山茶油主图03，要求：…。 |
+| 修改文案 | 使用 $ecommerce-image-workflow，仅修改苹果详情02的文案，要求：…，先不生图。 |
+| 导出交付 | 使用 $ecommerce-image-workflow，仅导出已通过的图片并制作交付预览，不生图。 |
+
+### 已有项目示例
 
 `使用 $ecommerce-image-workflow，项目总目录：…，仅返修山茶油主图03，要求：原料更大，接近参考构图。`
 
