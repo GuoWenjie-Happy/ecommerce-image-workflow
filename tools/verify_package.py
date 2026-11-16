@@ -77,6 +77,15 @@ with tempfile.TemporaryDirectory() as tmp:
     else:
         print('SKIP: bundled white checker runtime checks require NumPy; snapshot checks still run.')
 version = (root/'VERSION').read_text(encoding='utf-8').strip()
+project_checks = subprocess.run([sys.executable, str(root/'tools'/'test_project_files.py')], capture_output=True, encoding='utf-8')
+assert project_checks.returncode == 0, (project_checks.stdout, project_checks.stderr)
+print(project_checks.stdout.strip())
+reference_checks = subprocess.run([sys.executable, str(root/'tools'/'test_reference_cache.py')], capture_output=True, encoding='utf-8')
+assert reference_checks.returncode == 0, (reference_checks.stdout, reference_checks.stderr)
+print(reference_checks.stdout.strip())
+prompt_checks = subprocess.run([sys.executable, str(root/'tools'/'test_prompt_builder.py')], capture_output=True, encoding='utf-8')
+assert prompt_checks.returncode == 0, (prompt_checks.stdout, prompt_checks.stderr)
+print(prompt_checks.stdout.strip())
 assert re.fullmatch(r'\d+\.\d+\.\d+', version), 'Invalid VERSION'
 if '--build' not in sys.argv:
     print('PASS: metadata, internal links, portable paths, licenses and file operation checks.')

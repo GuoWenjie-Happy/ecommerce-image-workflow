@@ -110,33 +110,36 @@ def export(args):
 
 
 def preview(args):
-    files = inputs(args.input)
+    files = getattr(args, 'files', None)
+    if files is None:
+        files = inputs(args.input)
     if not files:
         raise ValueError('No images: refusing to create an empty preview.')
     output = Path(args.output).resolve()
     if any(p.resolve() == output for p in files):
         raise ValueError('Preview output must be outside the input image set.')
     tiles = []
+    background = getattr(args, 'background', 'white')
     for path in files:
         with Image.open(path) as src:
             im = ImageOps.exif_transpose(src).convert('RGBA')
             if args.kind == 'detail':
                 im = im.resize((args.width, max(1, round(im.height * args.width / im.width))), Image.Resampling.LANCZOS)
-                tile = Image.new('RGB', im.size, 'white')
+                tile = Image.new('RGB', im.size, background)
                 tile.paste(im, mask=im.getchannel('A'))
             else:
                 im.thumbnail((args.width, args.width), Image.Resampling.LANCZOS)
-                tile = Image.new('RGB', (args.width, args.width), 'white')
+                tile = Image.new('RGB', (args.width, args.width), background)
                 tile.paste(im, ((args.width-im.width)//2, (args.width-im.height)//2), im)
             tiles.append(tile)
     if args.kind == 'detail':
-        canvas = Image.new('RGB', (args.width, sum(t.height for t in tiles)), 'white')
+        canvas = Image.new('RGB', (args.width, sum(t.height for t in tiles)), background)
         y = 0
         for tile in tiles:
             canvas.paste(tile, (0, y)); y += tile.height
     else:
         columns = min(args.columns, len(tiles))
-        canvas = Image.new('RGB', (args.width*columns, args.width*math.ceil(len(tiles)/columns)), 'white')
+        canvas = Image.new('RGB', (args.width*columns, args.width*math.ceil(len(tiles)/columns)), background)
         for i, tile in enumerate(tiles):
             canvas.paste(tile, ((i % columns)*args.width, (i // columns)*args.width))
     save_image(canvas, args.output)
