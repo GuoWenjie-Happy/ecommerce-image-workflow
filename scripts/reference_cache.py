@@ -52,7 +52,13 @@ def prepare(spec):
     categories = spec['categories']
     if not root.is_dir() or not isinstance(categories, dict) or not categories or not set(categories) <= {'main', 'detail'}:
         raise ValueError('Expected suite directory and explicit main/detail categories')
-    cache = Path(spec.get('cache', root/'_参考缓存')).resolve()
+    default_cache = (root/'_参考缓存').resolve()
+    cache = Path(spec.get('cache', default_cache)).resolve()
+    location_reason = None
+    if cache != default_cache:
+        location_reason = spec.get('cache_override')
+        if not isinstance(location_reason, dict) or location_reason.get('kind') not in {'write_error', 'permission_restriction', 'user_request'} or not isinstance(location_reason.get('evidence'), str) or not location_reason['evidence'].strip():
+            raise ValueError('Nondefault cache requires cache_override kind and concrete evidence; use the suite _参考缓存 by default')
     if cache == root:
         raise ValueError('Cache must be a dedicated derived-output directory')
     folders = {}
@@ -114,9 +120,10 @@ def prepare(spec):
                       **analysis_state(analysis, previous, files, token, rules)}
             index['categories'][kind] = record
             results[kind] = {**record, 'updated': updated}
+        index['cache_location'] = {'default': str(default_cache), 'actual': str(cache), 'override': location_reason}
         index['checked_at'] = now()
         atomic(index_path, encode(index))
-    return {'source': str(root), 'cache': str(cache), 'status': 'completed', 'categories': results}
+    return {'source': str(root), 'cache': str(cache), 'cache_location': index['cache_location'], 'status': 'completed', 'categories': results}
 
 
 def main():

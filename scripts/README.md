@@ -112,6 +112,8 @@ inventory排除.git、_参考缓存和__pycache__；errors非空时必须核对�
 
 只做详情仅传detail。直接读取类别目录内图片，不递归误收缓存。默认写该套系 `_参考缓存/`；未授权写参考库或只读时，清单显式填cache为项目 `公共参考/<套系ID>/` 的绝对路径，不自动寻找或切换位置。不同来源不得共用cache。
 
+正常清单省略cache，使用默认路径。非默认cache必须同时提供cache_override对象：kind为write_error、permission_restriction或user_request，evidence填写实际写入错误、明确限制写入范围的规则或用户指定位置的原话；不因用户填写了项目输出目录就推断参考库未授权。脚本检查声明结构并将原因登记到缓存索引和返回结果，不验证声明真实性，执行者必须核实并告知用户。缺原因时拒绝创建备用缓存，不能改用临时脚本绕过。
+
 稳定输出为index.json、main_overview.jpg和detail_overview.jpg。索引记录路径、编号、排序、宽高、比例、内容哈希、fingerprint、总览路径及哈希；未变化复用，新增/删除/改名/替换仅更新受影响类别，总览损坏重建。空目录、坏图报错，不生成空尺寸报告；重复内容不去重，重复编号用duplicate_ids提示，必须核对后建立映射。
 
 工具不分析设计。AI完成原参考分析后另写main_analysis.json/detail_analysis.json，包含source_fingerprint（当前fingerprint）、rules_version（当前analysis_rules_version）及非空analysis。指纹或规则不匹配时analysis_required为true；规则变化只需重分析，不无故重拼总览。公共分析不代替每产品专属风格配色与文案。
@@ -119,3 +121,21 @@ inventory排除.git、_参考缓存和__pycache__；errors非空时必须核对�
 每类返回changes，逐张列added、removed、modified、unchanged（原图相对路径），sequence_changed说明文件顺序清单有变；改名按删除加新增处理。changes对比上次扫描，analysis_changes对比有效AI分析所依据的原图，分析未完成时重复扫描不会清空待办。analysis_scope为none时复用，为incremental时只处理变化图片及受影响结论；为full时表示首次分析、规则改变或有效分析依据缺失，需重新建立该类基础分析。仅总览损坏不会触发原图重分析。
 
 缓存加锁，索引原子写入，原参考不修改，未登记的同名总览不覆盖。总控统一准备、产品任务只读共享，避免并行重复制作。全流程分工见 [批量检查表](../references/batch-operations.md)。
+
+## 前置参考分析与公共选套索引
+
+AI分析文件仍使用source_fingerprint、rules_version、analysis。新分析的analysis结构如下（逐图字段填写具体观察，不照抄示例）：
+
+```json
+{"pages":[{"path":"主图/01.jpg","sha256":"<当前原图哈希>","order":1,"content":"原图具体标题、辅助文字、信息组和图像内容","purchase_task":"页面购买任务","expression":"表达力度及依据","image_text_relation":"图文位置、对应及支撑关系","composition":"主体、区域、层级、遮挡","transfer":"可迁移机制与不可照搬事实","uncertainties":"不确定内容；没有则明确写无"}],"suite_style":"整套字体、配色、光影和装饰关系","selection":{"product_forms":"形态适配","design_features":"设计特点","modules":"模块组成","required_materials":"所需素材","adjustable_items":"可调整项"},"review":{"status":"passed","checked_paths":["主图/01.jpg"]}}
+```
+
+每个类别pages按扫描files顺序覆盖全部原图，order从1开始；路径和哈希须准确绑定。review记录AI实际对照原图抽查的路径，不能填脚本通过代替看图。旧分析可以保留，结构不足时公共索引标incomplete，补全后才作为详细分析复用。
+
+批量入口：`python reference_catalog.py "参考库清单.json"`，清单示例：
+
+```json
+{"root":"<参考库绝对路径>","sets":[{"suite":"水果/套系01","categories":{"main":"主图","detail":"详情图"},"analysis_rules_version":"1"}]}
+```
+
+前置全库任务的sets列出枚举到的全部套系，普通制作可仅列候选但不能声称覆盖全库。工具逐套复用reference_cache检查文件，再将有效分析汇总为根目录_公共参考中的选套索引.json及选套说明.md；不调用AI、不自动生成或修改分析。运行可先产出missing列表，AI批量完成所需分析后再汇总。类别状态ready/missing/stale/incomplete全部保留；出错停止、返回失败，不能把旧索引当本次成功结果。索引JSON为机器读取依据，说明文件仅供浏览；详细内容仍读取套系分析，哈希匹配不证明AI观察准确。

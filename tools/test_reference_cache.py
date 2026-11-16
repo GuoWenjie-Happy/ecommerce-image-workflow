@@ -64,4 +64,17 @@ with tempfile.TemporaryDirectory() as temp:
     assert rules['analysis_scope'] == 'full' and not rules['updated']
     (suite/'_参考缓存/detail_analysis.json').write_text('{broken', encoding='utf-8')
     assert run({'detail': 'detail'})['detail']['analysis_scope'] == 'full'
+    # An arbitrary output-directory override must fail before creating files.
+    override = root/'output'/'public'
+    spec = {'root': str(suite), 'categories': {'main': 'main'}, 'cache': str(override)}
+    request = root/'override.json'
+    request.write_text(json.dumps({'sets': [spec]}), encoding='utf-8')
+    result = subprocess.run([sys.executable, str(script), str(request)], capture_output=True, encoding='utf-8')
+    assert result.returncode != 0 and not override.exists()
+    spec['cache_override'] = {'kind': 'permission_restriction', 'evidence': 'Fixture: suite is outside the permitted write roots.'}
+    request.write_text(json.dumps({'sets': [spec]}), encoding='utf-8')
+    result = subprocess.run([sys.executable, str(script), str(request)], capture_output=True, encoding='utf-8')
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    recorded = json.loads((override/'index.json').read_text(encoding='utf-8'))
+    assert recorded['cache_location']['override'] == spec['cache_override']
 print('PASS: reference batch metadata, cache hits, content changes, corruption, deletion, category isolation and no reference deduplication.')
