@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert read.returncode == 0, read.stderr
     request = json.loads(read.stdout)
     assert request['prompt'] == text.split('\n\n## 完整提示词原文\n\n', 1)[1]
-    assert request['referenced_image_paths'] == [str(root/'product.png')]
+    assert request['referenced_image_paths'] == [str((root/'product.png').resolve())]
     (root/'prompts/tampered.md').write_text(text.replace('不猜写、不删除、不涂平', '保留品牌即可'), encoding='utf-8')
     bad = subprocess.run([sys.executable, str(reader), str(root/'prompts/tampered.md')], capture_output=True)
     assert bad.returncode != 0

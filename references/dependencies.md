@@ -27,8 +27,8 @@
 - `../bundled/poster-style-transfer/SKILL.md`：原版MIT许可，随目录保留LICENSE及附属参考。优先使用此包内版本，运行直接生成、风格分析或定向迭代。
 - `../bundled/ecommerce-visual-copywriting/SKILL.md`：原版MIT许可，保留LICENSE及运行参考、素材和脚本。用于商品证据、逐图文案及执行卡；内部自审留工作目录，不强加用户确认或长篇交付。
 - `amazon-white-background`：素材阶段及完整制作直接读取包内 `../bundled/ecommerce-image-skills/skills/amazon-white-background/SKILL.md`，无需单独安装。许可证来自集合根目录MIT LICENSE，不再因子目录无独立LICENSE而误判未授权。完整集合含12个技能，仅按本流程职责调用白底；不启动ecommerce-listing-suite的整套策划或其他未请求阶段，不自动注册全部子技能到宿主。
-- 白底技能附属脚本位于其入口旁 `scripts/`，集合共用脚本位于 `../bundled/ecommerce-image-skills/scripts/`。内置图片能力优先；本流程不执行上游收费API、推广链接及无限重试路线，也不使用检查脚本的 `--fix` 自动重裁或改像素。白底检查脚本依赖Pillow及NumPy，按需复用已安装环境；缺少时准确报告，不自动安装。其他文件检查继续使用本技能 `scripts/ecom_files.py`。
-- 第三方技能中的相对脚本路径以被读取的第三方 `SKILL.md` 所在目录解析，不以项目当前目录或本总控根目录解析。白底检查使用 `<本技能根目录>/bundled/ecommerce-image-skills/skills/amazon-white-background/scripts/check_main_image.py <白底原件绝对路径> --json`，调用前展开真实绝对路径；读取JSON内各指标，不把命令退出成功等同于商品视觉验收。脚本的尺寸与背景阈值仅是辅助指标，本流程的产品保真、素材像素披露、构图与返修规则仍优先。
+- 白底技能附属脚本位于其入口旁 `scripts/`，集合共用脚本位于 `../bundled/ecommerce-image-skills/scripts/`，作为带许可证的上游快照原样保留。正式流程不调用这些上游脚本，不执行收费API、推广链接、自动修图或无限重试路线；内置图片能力负责生成，本技能 `scripts/ecom_files.py inspect` 负责客观文件检查，AI看图负责商品与视觉验收。
+- 第三方技能中的相对路径仅用于读取其规则和保留上游资源，不改变本流程的工具入口。正式白底检查读取 `ecom_files.py inspect` 的尺寸、比例、近白边缘和近似主体占比；这些指标不等于商品保真或视觉验收通过。
 - `detail-flow`：外部必需（成图审查阶段及完整制作），来源：https://github.com/AJbeckliy/detail-flow-V2-Ajie 。仅借用审查模式，不执行其Starcanvas、HTML或安装后端链。本地未找到独立分发许可，因此未复制。
 
 不要自动安装或覆盖其他技能、运行陌生下载脚本或购买服务。缺失依赖列出准确名称及上面来源，用户安装后复查继续；不谎称一个ZIP已包含全部第三方技能。用户提供分发许可后可另做完整依赖包。已知来源仅用于定位，不代表已在线验证最新版本。

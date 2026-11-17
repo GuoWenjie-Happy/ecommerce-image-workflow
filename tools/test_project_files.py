@@ -47,6 +47,14 @@ with tempfile.TemporaryDirectory() as temporary:
         assert image.size == (900, 1800)
     records = [json.loads(line) for line in result.stdout.splitlines()]
     assert records[0]['result']['upscaled'] is True and records[0]['result']['exported'] == [1000, 1000]
+    Image.new('RGB', (2400, 2400), 'white').save(root / 'white-native.png')
+    native_white = invoke([{'op': 'export', 'source': 'white-native.png', 'target': 'delivery/materials/white-native.png', 'width': 1000, 'square': True, 'approved': True}])
+    native_result = json.loads(native_white.stdout)['result']
+    assert native_result['native'] == [2400, 2400] and native_result['exported'] == [1000, 1000] and native_result['upscaled'] is False
+    Image.new('RGB', (800, 800), 'white').save(root / 'white-small.png')
+    small_white = invoke([{'op': 'export', 'source': 'white-small.png', 'target': 'delivery/materials/white-small.png', 'width': 1000, 'square': True, 'approved': True}])
+    small_result = json.loads(small_white.stdout)['result']
+    assert small_result['native'] == [800, 800] and small_result['exported'] == [1000, 1000] and small_result['upscaled'] is True
     assert len(json.loads((root / 'work/export-check.json').read_text(encoding='utf-8'))['images']) == 2
     invoke([{'op': 'export', 'source': 'source.png', 'target': 'unapproved.png', 'width': 1000}], False)
     invoke([{'op': 'export', 'source': 'detail-source.png', 'target': 'bad-square.png', 'width': 1000, 'square': True, 'approved': True}], False)
@@ -90,5 +98,7 @@ with tempfile.TemporaryDirectory() as temporary:
     invoke([{'op': 'json', 'target': 'work/product.json', 'data': product, 'replace': True}, {'op': 'overview', 'project': 'project.json', 'target': '交付/交付总览.md', 'replace': True}])
     assert '0/2' in (root / '交付/交付总览.md').read_text(encoding='utf-8')
     invoke([{'op': 'environment', 'target': 'work/environment.json'}])
-    assert json.loads((root / 'work/environment.json').read_text(encoding='utf-8'))['python'] == sys.executable
+    environment = json.loads((root / 'work/environment.json').read_text(encoding='utf-8'))
+    assert environment['python'] == sys.executable
+    assert 'numpy_available' not in environment
 print('PASS: large file input, guarded JSON merge, confinement, archive, batch export/inspect/count/selected previews, stop-on-error, timing and real-file delivery overview.')

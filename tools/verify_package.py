@@ -1,6 +1,5 @@
 import json
 import hashlib
-import importlib.util
 import re
 import subprocess
 import sys
@@ -59,23 +58,6 @@ with tempfile.TemporaryDirectory() as tmp:
     assert Image.open(base/'detail.jpg').size==(90,250)
     run('count',src,src,'--report',base/'counts.json')
     json.loads((base/'counts.json').read_text(encoding='utf-8'))
-    if importlib.util.find_spec('numpy') is not None:
-        from PIL import ImageDraw
-        checker = upstream_root/'skills'/'amazon-white-background'/'scripts'/'check_main_image.py'
-        fixture = Image.new('RGB', (1000, 1000), 'white')
-        ImageDraw.Draw(fixture).rectangle((65, 65, 934, 934), fill=(80, 80, 80))
-        fixture.save(base/'checker-pass.png')
-        Image.new('RGB', (1000, 1000), 'white').save(base/'checker-fail.png')
-        for filename, expected_code, expected_pass in [('checker-pass.png', 0, True), ('checker-fail.png', 1, False)]:
-            fixture_path = base/filename
-            before = fixture_path.read_bytes()
-            result = subprocess.run([sys.executable, '-X', 'utf8', str(checker), str(fixture_path), '--json'], capture_output=True, encoding='utf-8')
-            assert result.returncode == expected_code, (result.stdout, result.stderr)
-            assert json.loads(result.stdout)['pass'] is expected_pass
-            assert fixture_path.read_bytes() == before, 'Read-only checker changed input'
-        print('PASS: bundled white checker accepts valid geometry, rejects empty canvas and preserves inputs.')
-    else:
-        print('SKIP: bundled white checker runtime checks require NumPy; snapshot checks still run.')
 version = (root/'VERSION').read_text(encoding='utf-8').strip()
 project_checks = subprocess.run([sys.executable, str(root/'tools'/'test_project_files.py')], capture_output=True, encoding='utf-8')
 assert project_checks.returncode == 0, (project_checks.stdout, project_checks.stderr)
@@ -89,6 +71,9 @@ print(catalog_checks.stdout.strip())
 prompt_checks = subprocess.run([sys.executable, str(root/'tools'/'test_prompt_builder.py')], capture_output=True, encoding='utf-8')
 assert prompt_checks.returncode == 0, (prompt_checks.stdout, prompt_checks.stderr)
 print(prompt_checks.stdout.strip())
+policy_checks = subprocess.run([sys.executable, str(root/'tools'/'test_repository_policy.py')], capture_output=True, encoding='utf-8')
+assert policy_checks.returncode == 0, (policy_checks.stdout, policy_checks.stderr)
+print(policy_checks.stdout.strip())
 assert re.fullmatch(r'\d+\.\d+\.\d+', version), 'Invalid VERSION'
 if '--build' not in sys.argv:
     print('PASS: metadata, internal links, portable paths, licenses and file operation checks.')

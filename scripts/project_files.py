@@ -3,7 +3,6 @@ import argparse
 from contextlib import contextmanager, redirect_stdout
 from datetime import datetime, timezone
 import hashlib
-import importlib.util
 import io
 import json
 import os
@@ -300,7 +299,7 @@ def execute(root, op):
             elif kind == 'overview':
                 atomic(target, overview(root, read_json(local(root, op['project']))))
             elif kind == 'environment':
-                atomic(target, encode({'python': sys.executable, 'python_version': sys.version, 'checked_at': now(), 'pillow': Image.__version__, 'numpy_available': importlib.util.find_spec('numpy') is not None, 'project_root': str(root)}))
+                atomic(target, encode({'python': sys.executable, 'python_version': sys.version, 'checked_at': now(), 'pillow': Image.__version__, 'project_root': str(root)}))
             else:
                 raise ValueError(f'Unknown operation: {kind}')
     result = {'op': kind, 'target': str(target), 'status': 'completed', 'sha256': digest(target)}

@@ -10,7 +10,7 @@
 
 内置技能也已登记上游来源、仓库内路径和更新定位规则，见 [依赖来源与更新说明](references/dependencies.md)。以后可直接说“更新内置 poster-style-transfer”或“更新内置 ecommerce-visual-copywriting”；执行者据此检查上游并更新本仓库对应 `bundled/` 副本，不自动修改宿主安装副本。
 
-文件工具依赖Python3和Pillow：已有依赖直接复用，缺少时对所选解释器执行 `python -m pip install -r <本技能目录>/scripts/requirements.txt`。集合内白底检查脚本另需NumPy，使用前检查现有环境。技能本身不提供生图账号或服务。
+文件检查、等比导出、预览和项目记录依赖Python3和Pillow：已有依赖直接复用，缺少时对所选解释器执行 `python -m pip install -r <本技能目录>/scripts/requirements.txt`。正式流程只使用本仓库的Pillow文件工具；技能本身不提供生图账号或服务。
 
 ## 使用
 
@@ -87,6 +87,8 @@ python tools/verify_package.py --build
 ```
 
 第一条验证元数据、包内引用和文件工具；第二条验证后生成 `dist/ecommerce-image-workflow-<VERSION>.zip`。压缩包固定包含一层技能文件夹，按允许清单打包，不带Git、开发工具、项目数据或历史ZIP。版本由 `VERSION` 管理，变化记入 `CHANGELOG.md`。上传GitHub时提交源文件，ZIP通过Release附件分发。
+
+日常更新与正式发布分开：日常推送不升版本；用户明确要求发布时才更新版本、创建标签和GitHub Release。维护者按 [RELEASE.md](RELEASE.md) 的完整清单操作。
 
 验证脚本不代替真实生图测试，也不包含官方skill校验器。本地首版尝试官方校验时缺少PyYAML且网络不可用，未宣称官方校验通过。
 
