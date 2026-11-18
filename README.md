@@ -42,7 +42,7 @@
 
 | 目的 | 可复制的指令 |
 |---|---|
-| 模板前置 | 使用 $ecommerce-image-workflow，仅做模板前置：校验模板并（如需）生成锁定 slots，写 `模板索引.json`+`模板前置.md`，不生图、不跑参考。模板：…。 |
+| 模板前置 | 使用 $ecommerce-image-workflow，仅做模板前置：校验模板并（如需）生成锁定 slots，写入模板旁 `_模板缓存/`，不生图、不跑参考。模板：…。 |
 | 参考库前置 | 使用 $ecommerce-image-workflow，仅预分析整个参考库并更新公共选套索引，不生图。参考库：…。 |
 | 整理商品资料 | 使用 $ecommerce-image-workflow，仅整理商品资料，不生图。 |
 | 处理产品素材 | 使用 $ecommerce-image-workflow，仅制作商品白底和透明底素材。 |

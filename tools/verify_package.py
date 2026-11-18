@@ -63,8 +63,10 @@ with tempfile.TemporaryDirectory() as tmp:
     assert re.fullmatch(r'[0-9a-f]{64}', fp['sha256'])
     slots = {'canvas': [120, 120], 'separators': [
         {'between': ['a', 'b'], 'char': '|'}], 'slots': [
-        {'id': 'a', 'box': [10, 90, 50, 115], 'max_chars': 4, 'font_size': 18},
-        {'id': 'b', 'box': [70, 90, 110, 115], 'max_chars': 4, 'font_scale': 0.7}]}
+        {'id': 'a', 'box': [10, 90, 50, 115], 'max_chars': 4, 'font_size': 18,
+         'font_weight': 'bold'},
+        {'id': 'b', 'box': [70, 90, 110, 115], 'max_chars': 4, 'font_scale': 0.78,
+         'font_weight': 'bold'}]}
     slots_path = base/'slots.json'
     slots_path.write_text(json.dumps(slots), encoding='utf-8')
     ok_slots = json.loads(run('validate-slots', slots_path, '--shell', src/'01.png').stdout)

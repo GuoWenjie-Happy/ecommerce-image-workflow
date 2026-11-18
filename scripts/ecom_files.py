@@ -110,42 +110,90 @@ def export(args):
                 'native': native, 'exported': target, 'upscaled': args.width > native[0]})
 
 
-def _cjk_font(size):
-    # ponytail: 常见系统字体探测；找不到则用默认位图字体（中文可能方框）
+def _pingfang_ttc_paths():
+    """苹果苹方：旧版 Fonts/、新版 MobileAsset（哈希目录会变，用 glob）。"""
+    found = []
+    assets = Path('/System/Library/AssetsV2')
     candidates = [
-        '/System/Library/Fonts/PingFang.ttc',
-        '/System/Library/Fonts/STHeiti Light.ttc',
-        '/Library/Fonts/Arial Unicode.ttf',
-        'C:/Windows/Fonts/msyh.ttc',
-        'C:/Windows/Fonts/simhei.ttf',
-        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
-        '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+        Path('/System/Library/Fonts/PingFang.ttc'),
+        *(assets.glob('com_apple_MobileAsset_Font*/**/AssetData/PingFang.ttc')
+          if assets.is_dir() else ()),
     ]
     for path in candidates:
-        if Path(path).is_file():
+        if path.is_file() and path not in found:
+            found.append(path)
+    return found
+
+
+def _cjk_font_candidates(want_bold):
+    """苹果优先苹方 SC；粗体用 Semibold→Medium。其它系统再回退雅黑/Noto。"""
+    # PingFang SC：Regular=3, Medium=7, Semibold=11（HK/MO/TC/SC 四语文一套）
+    apple = []
+    for path in _pingfang_ttc_paths():
+        if want_bold:
+            apple.extend([(path, 11), (path, 7), (path, 3)])
+        else:
+            apple.extend([(path, 3), (path, 7)])
+    if want_bold:
+        other = [
+            (Path('C:/Windows/Fonts/msyhbd.ttc'), 0),
+            (Path('C:/Windows/Fonts/simhei.ttf'), 0),
+            (Path('/System/Library/Fonts/STHeiti Medium.ttc'), 0),
+            (Path('/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc'), 0),
+            (Path('/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc'), 0),
+            (Path('C:/Windows/Fonts/msyh.ttc'), 0),
+            (Path('/System/Library/Fonts/STHeiti Light.ttc'), 0),
+        ]
+    else:
+        other = [
+            (Path('C:/Windows/Fonts/msyh.ttc'), 0),
+            (Path('/System/Library/Fonts/STHeiti Light.ttc'), 0),
+            (Path('/Library/Fonts/Arial Unicode.ttf'), 0),
+            (Path('C:/Windows/Fonts/simhei.ttf'), 0),
+            (Path('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'), 0),
+            (Path('/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc'), 0),
+            (Path('/System/Library/Fonts/STHeiti Medium.ttc'), 0),
+        ]
+    return apple + other
+
+
+def _cjk_font(size, weight='bold'):
+    """加载中文字体；Apple 优先苹方；bold 时优先 Semibold。"""
+    want_bold = str(weight).lower() in ('bold', 'semibold', 'medium', 'heavy', 'black')
+    for path, index in _cjk_font_candidates(want_bold):
+        if not path.is_file():
+            continue
+        try:
+            return ImageFont.truetype(str(path), size=size, index=index), want_bold
+        except OSError:
             try:
-                return ImageFont.truetype(path, size=size)
+                return ImageFont.truetype(str(path), size=size), want_bold
             except OSError:
                 continue
-    return ImageFont.load_default()
+    return ImageFont.load_default(), want_bold
+
+
+def _slot_type_size(slot, height):
+    """字号：font_size 优先，否则 font_scale×栏高；默认 scale=0.78（贴示意栏高，勿用过小默认）。"""
+    if isinstance(slot.get('font_size'), int) and slot['font_size'] > 0:
+        return slot['font_size']
+    scale = slot.get('font_scale')
+    if not isinstance(scale, (int, float)) or scale <= 0:
+        scale = 0.78
+    return max(16, int(height * float(scale)))
 
 
 def _slot_font(slot, height):
-    """字号：font_size 优先，否则 font_scale×栏高，再否则 0.55（偏小，slots 应写明示意字号）。"""
-    if isinstance(slot.get('font_size'), int) and slot['font_size'] > 0:
-        size = slot['font_size']
-    else:
-        scale = slot.get('font_scale')
-        if not isinstance(scale, (int, float)) or scale <= 0:
-            scale = 0.55
-        size = max(14, int(height * float(scale)))
-    return _cjk_font(size)
+    size = _slot_type_size(slot, height)
+    weight = slot.get('font_weight') or 'bold'
+    font, want_bold = _cjk_font(size, weight=weight)
+    return font, size, want_bold
 
 
 def _separator_points(sep, slots_by_id):
     """解析分隔位置：绝对坐标或两槽 box 中点。"""
     if 'x' in sep and 'y' in sep:
-        return float(sep['x']), float(sep['y']), int(sep.get('font_size') or 28)
+        return float(sep['x']), float(sep['y']), int(sep.get('font_size') or 28), sep.get('font_weight') or 'bold'
     pair = sep.get('between')
     if not (isinstance(pair, list) and len(pair) == 2):
         raise ValueError('separator 须有 x,y 或 between:[id1,id2]')
@@ -157,9 +205,14 @@ def _separator_points(sep, slots_by_id):
     x = ((ra + lb) / 2) if ra <= lb else ((la + ra + lb + rb) / 4)
     y = (min(ta, tb) + max(ba, bb)) / 2
     height = max(12, max(ba - ta, bb - tb))
-    font_size = int(sep['font_size']) if isinstance(sep.get('font_size'), int) and sep['font_size'] > 0 \
-        else max(14, int(height * 0.55))
-    return x, y, font_size
+    if isinstance(sep.get('font_size'), int) and sep['font_size'] > 0:
+        font_size = sep['font_size']
+    else:
+        # 分隔符字号跟邻近槽一致：取两侧槽字号均值，否则栏高×0.78
+        sizes = [_slot_type_size(a, height), _slot_type_size(b, height)]
+        font_size = max(16, int(sum(sizes) / 2))
+    weight = sep.get('font_weight') or a.get('font_weight') or b.get('font_weight') or 'bold'
+    return x, y, font_size, weight
 
 
 def composite_frame(args):
@@ -201,19 +254,25 @@ def composite_frame(args):
                 if len(text) > max_chars:
                     text = text[:max_chars]
                 height = max(12, bottom - top)
-                font = _slot_font(slot, height)
+                font, font_size, want_bold = _slot_font(slot, height)
                 align = slot.get('align') or 'center'
                 cx = (left + right) / 2
                 cy = (top + bottom) / 2
                 anchor = {'left': 'lm', 'right': 'rm', 'center': 'mm'}.get(align, 'mm')
                 x = {'left': left, 'right': right, 'center': cx}.get(align, cx)
-                draw.text((x, cy), text, fill=slot.get('color') or '#FFFFFF',
-                          font=font, anchor=anchor)
+                fill = slot.get('color') or '#FFFFFF'
+                # 粗体字体缺失时用描边加粗，避免框上卖点发细发虚
+                stroke = max(1, font_size // 28) if want_bold else 0
+                draw.text((x, cy), text, fill=fill, font=font, anchor=anchor,
+                          stroke_width=stroke, stroke_fill=fill if stroke else None)
             for sep in slots_doc.get('separators') or []:
-                x, y, font_size = _separator_points(sep, slots_by_id)
-                draw.text((x, y), sep.get('char') or '|',
-                          fill=sep.get('color') or '#FFFFFF',
-                          font=_cjk_font(font_size), anchor='mm')
+                x, y, font_size, weight = _separator_points(sep, slots_by_id)
+                font, want_bold = _cjk_font(font_size, weight=weight)
+                fill = sep.get('color') or '#FFFFFF'
+                stroke = max(1, font_size // 28) if want_bold else 0
+                draw.text((x, y), sep.get('char') or '|', fill=fill, font=font,
+                          anchor='mm', stroke_width=stroke,
+                          stroke_fill=fill if stroke else None)
                 separators_drawn += 1
         save_image(canvas, args.output)
         report({
@@ -283,6 +342,12 @@ def validate_slots(args):
         if font_scale is not None and not (
                 isinstance(font_scale, (int, float)) and 0 < float(font_scale) <= 1.5):
             issues.append(f'slots[{i}] font_scale 须为 (0, 1.5] 数值')
+        weight = slot.get('font_weight')
+        if weight is not None and not isinstance(weight, str):
+            issues.append(f'slots[{i}] font_weight 须为字符串')
+        if font_size is None and font_scale is None:
+            issues.append(
+                f'slots[{i}] 须写 font_size 或 font_scale（对照示意，禁止依赖过小默认）')
     for i, sep in enumerate(doc.get('separators') or []):
         if not isinstance(sep, dict):
             issues.append(f'separators[{i}] 须为对象')
