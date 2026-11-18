@@ -6,7 +6,7 @@ import re
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.tif', '.tiff'}
 
@@ -109,6 +109,79 @@ def export(args):
                 'native': native, 'exported': target, 'upscaled': args.width > native[0]})
 
 
+def _cjk_font(size):
+    # ponytail: 常见系统字体探测；找不到则用默认位图字体（中文可能方框）
+    candidates = [
+        '/System/Library/Fonts/PingFang.ttc',
+        '/System/Library/Fonts/STHeiti Light.ttc',
+        '/Library/Fonts/Arial Unicode.ttf',
+        'C:/Windows/Fonts/msyh.ttc',
+        'C:/Windows/Fonts/simhei.ttf',
+        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+    ]
+    for path in candidates:
+        if Path(path).is_file():
+            try:
+                return ImageFont.truetype(path, size=size)
+            except OSError:
+                continue
+    return ImageFont.load_default()
+
+
+def composite_frame(args):
+    """将RGBA品牌框叠到内容图上；可选按slots.json填入卖点文字。"""
+    with Image.open(args.base) as base_src, Image.open(args.frame) as frame_src:
+        base = ImageOps.exif_transpose(base_src).convert('RGBA')
+        frame = ImageOps.exif_transpose(frame_src).convert('RGBA')
+        if frame.size != base.size:
+            frame = frame.resize(base.size, Image.Resampling.LANCZOS)
+        canvas = base.copy()
+        canvas.alpha_composite(frame)
+        texts = {}
+        if args.texts:
+            texts = json.loads(Path(args.texts).read_text(encoding='utf-8'))
+            if not isinstance(texts, dict):
+                raise ValueError('texts 须为 JSON 对象：槽位id → 字符串')
+        if args.slots:
+            slots_doc = json.loads(Path(args.slots).read_text(encoding='utf-8'))
+            canvas_size = tuple(slots_doc.get('canvas') or base.size)
+            if tuple(canvas_size) != base.size:
+                raise ValueError(
+                    f'内容图尺寸{base.size}与slots.canvas{canvas_size}不一致，先统一再合成')
+            # 先叠框再填字，避免不透明底栏盖住文字
+            draw = ImageDraw.Draw(canvas)
+            for slot in slots_doc.get('slots') or []:
+                sid = slot.get('id')
+                box = slot.get('box')
+                if not sid or not box or len(box) != 4:
+                    raise ValueError('每个slot须有id与box[左,上,右,下]')
+                text = texts.get(sid, '')
+                if not text:
+                    continue
+                left, top, right, bottom = box
+                max_chars = int(slot.get('max_chars') or 40)
+                text = text.strip()
+                if len(text) > max_chars:
+                    text = text[:max_chars]
+                height = max(12, bottom - top)
+                font = _cjk_font(max(14, int(height * 0.55)))
+                align = slot.get('align') or 'center'
+                cx = (left + right) / 2
+                cy = (top + bottom) / 2
+                anchor = {'left': 'lm', 'right': 'rm', 'center': 'mm'}.get(align, 'mm')
+                x = {'left': left, 'right': right, 'center': cx}.get(align, cx)
+                draw.text((x, cy), text, fill=slot.get('color') or '#FFFFFF',
+                          font=font, anchor=anchor)
+        save_image(canvas, args.output)
+        report({
+            'base': args.base, 'frame': args.frame, 'output': args.output,
+            'size': list(canvas.size),
+            'slots_filled': sorted(k for k, v in texts.items() if v) if texts else [],
+            'note': '仅叠框与可选填槽，不修改产品像素内容。'
+        })
+
+
 def preview(args):
     files = getattr(args, 'files', None)
     if files is None:
@@ -157,6 +230,10 @@ def main():
     pre.add_argument('--columns', type=int, default=3)
     count = sub.add_parser('count'); count.add_argument('references'); count.add_argument('delivered')
     count.add_argument('--report')
+    frame = sub.add_parser('composite-frame')
+    frame.add_argument('base'); frame.add_argument('frame'); frame.add_argument('output')
+    frame.add_argument('--slots', help='可选slots.json路径')
+    frame.add_argument('--texts', help='可选槽位文案JSON：id→字符串')
     args = parser.parse_args()
     if getattr(args, 'width', 1) < 1 or getattr(args, 'columns', 1) < 1:
         raise ValueError('Width and columns must be positive.')
@@ -166,6 +243,8 @@ def main():
         export(args)
     elif args.command == 'preview':
         preview(args)
+    elif args.command == 'composite-frame':
+        composite_frame(args)
     else:
         # Names are the reference IDs; do not renumber to conceal missing items.
         refs = inputs(args.references); delivered = inputs(args.delivered)

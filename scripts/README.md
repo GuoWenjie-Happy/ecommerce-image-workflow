@@ -20,7 +20,13 @@ python ecom_files.py preview detail "交付\详情" "交付\详情图预览.jpg"
 
 # 参考与交付文件均用相同编号作文件名，如01.png、02.jpg
 python ecom_files.py count "参考\详情" "交付\详情" --report "工作目录\数量核对.json"
+
+# 主图品牌框套版：内容图 + 项目模板PNG → 输出；有卖点槽时附slots与texts
+python ecom_files.py composite-frame "生成原件\主图\01.png" "模板\主图品牌框.png" "工作文件\产品A\生成原件\主图\01_套框.png"
+python ecom_files.py composite-frame "生成原件\主图\01.png" "模板\主图品牌框.png" "工作文件\产品A\生成原件\主图\01_套框.png" --slots "模板\主图品牌框.slots.json" --texts "工作文件\产品A\_临时\主图01_框文案.json"
 ```
+
+`composite-frame` 只叠框与可选填槽，不改产品像素；模板与卖点放置规则见 [品牌框模板约定](../references/brand-frame-template.md)。
 
 详情预览按数字文件名顺序等宽、从上到下拼接，不拉伸或裁切。主图联系表保留完整图片。极长JPEG不支持时脚本报错，可以明确使用PNG或降低预览宽度，不能假称生成成功。
 
