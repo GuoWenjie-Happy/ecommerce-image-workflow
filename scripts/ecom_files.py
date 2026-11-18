@@ -254,25 +254,21 @@ def composite_frame(args):
                 if len(text) > max_chars:
                     text = text[:max_chars]
                 height = max(12, bottom - top)
-                font, font_size, want_bold = _slot_font(slot, height)
+                font, _font_size, _want_bold = _slot_font(slot, height)
                 align = slot.get('align') or 'center'
                 cx = (left + right) / 2
                 cy = (top + bottom) / 2
                 anchor = {'left': 'lm', 'right': 'rm', 'center': 'mm'}.get(align, 'mm')
                 x = {'left': left, 'right': right, 'center': cx}.get(align, cx)
-                fill = slot.get('color') or '#FFFFFF'
-                # 粗体字体缺失时用描边加粗，避免框上卖点发细发虚
-                stroke = max(1, font_size // 28) if want_bold else 0
-                draw.text((x, cy), text, fill=fill, font=font, anchor=anchor,
-                          stroke_width=stroke, stroke_fill=fill if stroke else None)
+                # 框上卖点禁止描边；字重只靠粗体字体（如苹方 Semibold）
+                draw.text((x, cy), text, fill=slot.get('color') or '#FFFFFF',
+                          font=font, anchor=anchor)
             for sep in slots_doc.get('separators') or []:
                 x, y, font_size, weight = _separator_points(sep, slots_by_id)
-                font, want_bold = _cjk_font(font_size, weight=weight)
-                fill = sep.get('color') or '#FFFFFF'
-                stroke = max(1, font_size // 28) if want_bold else 0
-                draw.text((x, y), sep.get('char') or '|', fill=fill, font=font,
-                          anchor='mm', stroke_width=stroke,
-                          stroke_fill=fill if stroke else None)
+                font, _want_bold = _cjk_font(font_size, weight=weight)
+                draw.text((x, y), sep.get('char') or '|',
+                          fill=sep.get('color') or '#FFFFFF',
+                          font=font, anchor='mm')
                 separators_drawn += 1
         save_image(canvas, args.output)
         report({
