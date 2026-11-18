@@ -33,11 +33,18 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
   "references": [{"path":"<真实商品素材路径>","role":"product"},{"path":"<本张原参考路径>","role":"design"}],
   "style": "<本产品风格>",
   "layout": "<本张完整构图>",
-  "copy": "<全部准确新增文案；无字时明确写无新增文案>",
+  "copy": "<全部准确新增文案摘要；无字时明确写无新增文案>",
+  "dense_copy": false,
+  "copy_units": [
+    {"id": "L1", "title": "<短标题>", "body": "<完整说明句>"},
+    {"id": "R1", "title": "<短标题>", "body": "<完整说明句>"}
+  ],
   "constraints": "<本张限制>",
   "parameters": {"transparent_background": false}
 }
 ```
+
+`dense_copy`：双列对照、多行表、四宫格及以上且每格有正文、参数表等密文页必须为 `true`，并提供非空 `copy_units`；每一项须有可上图的 `title` 与 `body`（仅短印章位可 `"title_only": true`）。缺说明时 compose **失败退出**，不得生图。非密文页可省略 `copy_units`；一旦提供则同样校验完整性。组装成功后会把分位文案与「禁止自撰」写入提示词。
 
 stage允许white、transparent、main、detail、repair。出镜商品必须附product角色图；返修必须附edit_target当前编辑图。其他角色为design和identity_check。明确不出镜时仍要附参考，product_visible为false并填absence_reason，不能生成另一种包装凑版。素材阶段不允许不出镜。
 

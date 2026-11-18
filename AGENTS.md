@@ -6,6 +6,7 @@
 - bundled/是保留许可证的第三方副本。不要静默修改、删除其许可或替换成未知版本。
 - 不提交商品照片、参考图库、项目执行索引、生成图片、密钥或个人路径；第三方自带示例资源不属于用户项目素材。
 - scripts/是供技能运行使用的工具；tools/是仓库验证和发布工具。dist/只放构建产物，不纳入Git。
+- docs/可放非 skill 正文的本地备忘（整改清单、计划草稿、实战复核笔记等），**不上仓库**；已由 `.gitignore` 忽略。正式制作规则仍只进 `references/`、`SKILL.md`、`scripts/` 等技能源文件。
 - 改动文件工具后运行 python tools/verify_package.py；发布运行 python tools/verify_package.py --build。环境已具备Python和Pillow时不重复安装。
 - 发布时按 [RELEASE.md](RELEASE.md) 执行，同步VERSION和CHANGELOG.md，README版本信息保持一致。未经用户明确要求“发布新版本”不自动上传GitHub、创建标签或Release；日常推送不升版本。
 - 如需安装到宿主技能目录，从本仓库同步。不要将安装副本、旧流程快照与本仓库并行维护为多个源头。

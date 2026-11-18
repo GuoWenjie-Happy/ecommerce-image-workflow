@@ -58,6 +58,29 @@ with tempfile.TemporaryDirectory() as tmp:
     assert Image.open(base/'detail.jpg').size==(90,250)
     run('count',src,src,'--report',base/'counts.json')
     json.loads((base/'counts.json').read_text(encoding='utf-8'))
+    # 模板指纹与 slots 结构校验（满长看图自检仍由人工）
+    fp = json.loads(run('fingerprint', src/'01.png').stdout)
+    assert re.fullmatch(r'[0-9a-f]{64}', fp['sha256'])
+    slots = {'canvas': [120, 120], 'separators': [
+        {'between': ['a', 'b'], 'char': '|'}], 'slots': [
+        {'id': 'a', 'box': [10, 90, 50, 115], 'max_chars': 4, 'font_size': 18},
+        {'id': 'b', 'box': [70, 90, 110, 115], 'max_chars': 4, 'font_scale': 0.7}]}
+    slots_path = base/'slots.json'
+    slots_path.write_text(json.dumps(slots), encoding='utf-8')
+    ok_slots = json.loads(run('validate-slots', slots_path, '--shell', src/'01.png').stdout)
+    assert ok_slots['ok'] is True and ok_slots['shell']['sha256'] == fp['sha256']
+    Image.new('RGBA', (120, 120), (0, 0, 0, 0)).save(base/'frame.png')
+    texts = base/'texts.json'
+    texts.write_text(json.dumps({'a': '测测', 'b': '试试'}), encoding='utf-8')
+    framed = json.loads(run('composite-frame', src/'01.png', base/'frame.png',
+                            base/'framed.png', '--slots', slots_path,
+                            '--texts', texts).stdout)
+    assert framed['separators_drawn'] == 1 and framed['slots_filled'] == ['a', 'b']
+    bad = {'canvas': [120, 120], 'slots': [
+        {'id': 'top', 'box': [10, 10, 200, 40], 'max_chars': 8}]}
+    bad_path = base/'slots-bad.json'
+    bad_path.write_text(json.dumps(bad), encoding='utf-8')
+    run('validate-slots', bad_path, '--shell', src/'01.png', ok=False)
 version = (root/'VERSION').read_text(encoding='utf-8').strip()
 project_checks = subprocess.run([sys.executable, str(root/'tools'/'test_project_files.py')], capture_output=True, encoding='utf-8')
 assert project_checks.returncode == 0, (project_checks.stdout, project_checks.stderr)

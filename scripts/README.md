@@ -26,7 +26,15 @@ python ecom_files.py composite-frame "生成原件\主图\01.png" "模板\主图
 python ecom_files.py composite-frame "生成原件\主图\01.png" "模板\主图品牌框.png" "工作文件\产品A\生成原件\主图\01_套框.png" --slots "模板\主图品牌框.slots.json" --texts "工作文件\产品A\_临时\主图01_框文案.json"
 ```
 
-`composite-frame` 只叠框与可选填槽，不改产品像素；模板与卖点放置规则见 [品牌框模板约定](../references/brand-frame-template.md)。
+`composite-frame` 只叠框、填槽与可选 `separators`，按槽 `font_size`/`font_scale` 出字，不改产品像素；模板与卖点放置规则见 [品牌框模板约定](../references/brand-frame-template.md)。
+
+```powershell
+# 模板壳/示意内容指纹（复用比对）
+python ecom_files.py fingerprint "模板\头图品牌框.png"
+
+# slots 结构校验（可选对照壳尺寸）；满长看图自检仍须人工
+python ecom_files.py validate-slots "工作文件\_公共\头图品牌框.slots.json" --shell "模板\头图品牌框.png"
+```
 
 详情预览按数字文件名顺序等宽、从上到下拼接，不拉伸或裁切。主图联系表保留完整图片。极长JPEG不支持时脚本报错，可以明确使用PNG或降低预览宽度，不能假称生成成功。
 

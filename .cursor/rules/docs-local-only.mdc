@@ -1,0 +1,10 @@
+---
+description: docs/ 仅本地非 skill 备忘，不上仓库
+alwaysApply: true
+---
+
+# docs/ 本地备忘
+
+- `docs/` 可放非 skill 正文内容：整改清单、计划草稿、实战复核笔记等。
+- **不要**把 `docs/` 纳入 Git 提交或发布包；目录已在 `.gitignore`。
+- 要生效的制作规则写进 `references/`、`SKILL.md`、`scripts/` 等技能源文件，不要只留在 `docs/`。

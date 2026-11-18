@@ -7,6 +7,8 @@ venv/
 # Build outputs
 dist/
 *.zip
+# Local non-skill notes (整改/计划/复核)；不上仓库
+/docs/
 # Credentials and local state
 .env
 .env.*

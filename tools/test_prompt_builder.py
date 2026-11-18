@@ -49,4 +49,19 @@ with tempfile.TemporaryDirectory() as tmp:
     Image.new('RGB', (20, 20), 'red').save(root/'product.png')
     changed = subprocess.run([sys.executable, str(reader), str(root/'prompts/main01.md')], capture_output=True)
     assert changed.returncode != 0
+    # 密文页：缺说明不得 compose；完整 copy_units 须写入提示词
+    dense = copy.deepcopy(spec)
+    dense['stage'] = 'detail'
+    dense['output_spec'] = '900×1600px'
+    dense['dense_copy'] = True
+    run(dense, 'bad-dense.md', False)
+    dense['copy_units'] = [
+        {'id': 'L1', 'title': '不够甜香', 'body': ''},
+        {'id': 'R1', 'title': '红颜香甜', 'body': '红颜品种，甜香带酸'}]
+    run(dense, 'bad-dense-body.md', False)
+    dense['copy_units'][0]['body'] = '担心不够甜不够香'
+    ok_dense = run(dense, 'prompts/detail02.md')
+    dense_text = (root/'prompts/detail02.md').read_text(encoding='utf-8')
+    assert '担心不够甜不够香' in dense_text and '禁止自撰' in dense_text
+    assert json.loads(ok_dense.stdout)['result']['prompt_sha256']
 print('PASS: fixed preservation text, deterministic assembly, required fields/evidence, unknown-field reasons, repair target and immutable prompt snapshots.')

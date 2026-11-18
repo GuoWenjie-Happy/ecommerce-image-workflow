@@ -10,10 +10,47 @@ FIELDS = ('shape_proportions', 'structure', 'colors_materials', 'graphics_patter
 FIXED = Path(__file__).resolve().parents[1]/'references'/'product-preservation.txt'
 
 
+PLACEHOLDERS = ('同上', '…', '...', '待填写', '待补充', '待补', 'TBD', 'tbd')
+
+
 def text(value, field):
-    if not isinstance(value, str) or not value.strip() or value.strip() in ('同上', '…', '...', '待填写', '待补充'):
+    if not isinstance(value, str) or not value.strip() or value.strip() in PLACEHOLDERS:
         raise ValueError(f'Missing or placeholder text: {field}')
     return value.strip()
+
+
+def validate_copy_units(spec):
+    """密文页硬闸：每个信息位须有完整可上图标题+说明；缺说明不得组装生图。"""
+    stage = spec.get('stage')
+    if stage not in ('main', 'detail', 'repair'):
+        return
+    units = spec.get('copy_units')
+    dense = spec.get('dense_copy') is True
+    if dense and not units:
+        raise ValueError('密文页 dense_copy=true 须提供 copy_units（每格标题+说明）')
+    if units is None:
+        return
+    if not isinstance(units, list) or not units:
+        raise ValueError('copy_units 须为非空数组')
+    for i, unit in enumerate(units):
+        if not isinstance(unit, dict):
+            raise ValueError(f'copy_units[{i}] 须为对象')
+        text(unit.get('title'), f'copy_units[{i}].title')
+        if unit.get('title_only') is True:
+            continue
+        text(unit.get('body'), f'copy_units[{i}].body')
+
+
+def format_copy_units(units):
+    lines = ['准确文案分位（须逐字上图；无对应文案的说明区须留白或删层，禁止自撰）：']
+    for i, unit in enumerate(units, 1):
+        label = unit.get('id') or str(i)
+        if unit.get('title_only') is True:
+            lines.append(f'{label} 标题：{unit["title"].strip()}')
+        else:
+            lines.append(
+                f'{label} 标题：{unit["title"].strip()}；说明：{unit["body"].strip()}')
+    return '\n'.join(lines)
 
 
 def image_path(root, name):
@@ -82,8 +119,12 @@ def build(root, spec):
     sections = [f"任务阶段：{stage}；商品ID：{product_id}。", '输出规格：'+text(spec.get('output_spec'), 'output_spec'), '\n'.join(captions),
                 '商品观察表（observed为已观察；其他项只记录原因，不得据此补造）：\n'+'\n'.join(descriptions),
                 '商品出镜：'+('是' if visible else '否；原因：'+text(spec.get('absence_reason'), 'absence_reason'))]
+    validate_copy_units(spec)
     for key, label in [('style', '本产品风格'), ('layout', '本张构图'), ('copy', '准确新增文案'), ('constraints', '本张限制')]:
         sections.append(label+'：'+text(spec.get(key), key))
+    if isinstance(spec.get('copy_units'), list) and spec['copy_units']:
+        sections.append(format_copy_units(spec['copy_units']))
+        sections.append('禁止模型补字：图内新增文字只能逐字使用准确文案／copy_units；说明区无对应文案则留白或删该说明层，禁止自撰。')
     fixed = FIXED.read_text(encoding='utf-8-sig').strip()
     if not fixed:
         raise ValueError('Fixed preservation policy is missing')

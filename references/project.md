@@ -8,7 +8,7 @@
 
 项目根目录固定保存 `project.json`，项目内容与技能安装目录分离。索引所有项目内文件用相对项目根目录的路径，路径不允许 `..` 逃逸；外部输入首次登记绝对路径，移动或交给别人前把所选商品资料和参考复制进 `输入/` 并更新为相对路径。复制前检查容量与实际可读性，不静默覆盖。共享时明确是否已包含原始输入，不能虚称项目可迁移。
 
-用户指令写 `模板：` + 文件夹（与参考库相同写法；技能仓库不维护该目录）。执行者读取文件夹内图片并自行识别品牌框壳/示意等；用户不必标注、不必做 slots.json。写法见 [提示词模板](prompts.md#有模板)，规则见 [品牌框模板](brand-frame-template.md)。
+用户指令写 `模板：` + 文件夹（与参考库相同写法；技能仓库不维护该目录）。模板前置通过后成对写出 `工作文件/_公共/模板索引.json` 与 `模板前置.md`（含壳/示意指纹与 status），`project.json` 的 `template` 指向二者。写法见 [提示词模板](prompts.md#有模板)，规则见 [品牌框模板](brand-frame-template.md)。
 
 由执行者用文件工具维护JSON，不要求用户手写。先读取现有索引，不按文件修改时间猜最终版；先写新临时文件、验证JSON，再替换索引。并行产品各自写 `工作文件/<产品ID>/product.json`，总控汇总后更新project.json，避免共享写冲突。
 
@@ -24,7 +24,7 @@
 }
 ```
 
-产品索引包含 `facts_file`、`reference_set`、`style_file`、`materials`、`cards`、`images`、`stage_status`、`history`。materials逐项记录SKU、视角、source、white、transparent、检查结论和模糊位置。cards按 `main/03`、`detail/02` 记录参考原图、素材、准确文案、执行卡路径。images同键记录 original、repairs数组、selected、delivered、status、原生/交付尺寸、review、repair_attempts、additional_authorization。路径必须真实存在才登记已完成。history记录时间、用户要求、修改项、版本和额度；删除或移动文件后不可继续声称可用。
+产品索引包含 `facts_file`、`reference_set`、`style_file`、`materials`、`cards`、`images`、`stage_status`、`history`。materials逐项记录SKU、视角、source、white、transparent、检查结论和模糊位置。cards按 `main/03`、`detail/02` 记录参考原图、素材、准确文案、执行卡路径。images同键记录 original、repairs数组、selected、delivered、status、原生/交付尺寸（含是否上采样、宿主档位）、review、repair_attempts、additional_authorization；交付说明须写出原生宽高与是否上采样。路径必须真实存在才登记已完成。history记录时间、用户要求、修改项、版本和额度；删除或移动文件后不可继续声称可用。
 
 ### 记录归并与唯一有效版本
 
@@ -66,7 +66,7 @@
 
 | 阶段 | 最小输入 | 输出与停止点 |
 |---|---|---|
-| 模板前置 | 模板文件夹（`模板：`） | 壳/示意识别、套用范围、安全区；（如需）满长自检通过的锁定 slots；不生商品图、不跑参考。失败停止并反馈 |
+| 模板前置 | 模板文件夹（`模板：`） | `模板索引.json` + `模板前置.md`（指纹与 status）+ `project.json.template`；（如需）满长自检锁定的 slots；不生商品图、不跑参考。失败也写索引+报告后停止 |
 | 参考库前置 | 参考库 | 全库逐图分析/增量更新与公共选套索引；不生图。可与模板前置分开单独执行 |
 | 资料整理 | 商品照片和已有产品资料 | 商品事实、SKU与视角归属、证据及缺口记录，不生成 |
 | 素材处理 | 商品照片、SKU与视角归属 | 有用视角白底/透明底、检查记录、材料索引 |
