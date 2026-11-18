@@ -83,6 +83,19 @@ with tempfile.TemporaryDirectory() as tmp:
     bad_path = base/'slots-bad.json'
     bad_path.write_text(json.dumps(bad), encoding='utf-8')
     run('validate-slots', bad_path, '--shell', src/'01.png', ok=False)
+    # 单行拼句：compose 与 separators 不得并存；max_chars 须够拼满
+    line = {'canvas': [120, 120], 'separators': [], 'selling_point_compose': {
+        'slot_id': 'sp_line', 'parts': 3, 'part_max_chars': 5, 'joiner': '｜'},
+        'slots': [{'id': 'sp_line', 'box': [5, 90, 115, 115], 'max_chars': 17,
+                   'font_size': 18, 'font_weight': 'bold'}]}
+    line_path = base/'slots-line.json'
+    line_path.write_text(json.dumps(line, ensure_ascii=False), encoding='utf-8')
+    assert json.loads(run('validate-slots', line_path).stdout)['ok'] is True
+    mixed = dict(line)
+    mixed['separators'] = [{'between': ['sp_line', 'sp_line'], 'char': '|'}]
+    mixed_path = base/'slots-mixed.json'
+    mixed_path.write_text(json.dumps(mixed, ensure_ascii=False), encoding='utf-8')
+    run('validate-slots', mixed_path, ok=False)
 version = (root/'VERSION').read_text(encoding='utf-8').strip()
 project_checks = subprocess.run([sys.executable, str(root/'tools'/'test_project_files.py')], capture_output=True, encoding='utf-8')
 assert project_checks.returncode == 0, (project_checks.stdout, project_checks.stderr)

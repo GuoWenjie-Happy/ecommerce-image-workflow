@@ -358,6 +358,38 @@ def validate_slots(args):
                 issues.append(f'separators[{i}] 须有 x,y 或 between:[id1,id2]')
             elif seen and any(x not in seen for x in pair):
                 issues.append(f'separators[{i}] between 引用未知槽 id')
+    compose = doc.get('selling_point_compose')
+    if compose is not None:
+        if not isinstance(compose, dict):
+            issues.append('selling_point_compose 须为对象')
+        else:
+            sid = compose.get('slot_id')
+            parts = compose.get('parts')
+            part_max = compose.get('part_max_chars')
+            joiner = compose.get('joiner')
+            if not (isinstance(sid, str) and sid in seen):
+                issues.append('selling_point_compose.slot_id 须指向已有槽')
+            if not (isinstance(parts, int) and parts >= 2):
+                issues.append('selling_point_compose.parts 须为≥2的整数')
+            if not (isinstance(part_max, int) and part_max > 0):
+                issues.append('selling_point_compose.part_max_chars 须为正整数')
+            if not (isinstance(joiner, str) and joiner):
+                issues.append('selling_point_compose.joiner 须为非空字符串')
+            elif doc.get('separators'):
+                issues.append('单行拼句模式不应同时带非空 separators（二选一）')
+            # 整句上限：parts*part_max + (parts-1)*len(joiner)
+            if (isinstance(parts, int) and parts >= 2
+                    and isinstance(part_max, int) and part_max > 0
+                    and isinstance(joiner, str) and isinstance(sid, str)
+                    and sid in seen):
+                need = parts * part_max + (parts - 1) * len(joiner)
+                for slot in slots:
+                    if slot.get('id') == sid:
+                        mc = slot.get('max_chars')
+                        if isinstance(mc, int) and mc < need:
+                            issues.append(
+                                f'槽 {sid} max_chars={mc} 小于拼句满长 {need}')
+                        break
     shell_info = None
     if args.shell:
         shell = Path(args.shell)
