@@ -32,9 +32,14 @@ python ecom_files.py composite-frame "生成原件\主图\01.png" "模板\主图
 # 模板壳/示意内容指纹（复用比对）
 python ecom_files.py fingerprint "模板\头图品牌框.png"
 
+# 壳内容区真透明硬检（不过不得当正式壳；可选 --min-clear，默认 0.80）
+python ecom_files.py validate-shell "模板\头图品牌框.png" --safe-area 0.12,0.16,0.02,0.02
+
 # slots 结构校验（可选对照壳尺寸）；满长看图自检仍须人工
-python ecom_files.py validate-slots "工作文件\_公共\头图品牌框.slots.json" --shell "模板\头图品牌框.png"
+python ecom_files.py validate-slots "模板\_模板缓存\头图品牌框.slots.json" --shell "模板\头图品牌框.png"
 ```
+
+`validate-shell` 通过才可把壳写入跨项目 `_模板缓存`；失败登记 `shell_alpha: missing`。应急挖洞仅项目内 `derived_shell`，不得冒充正式壳。
 
 详情预览按数字文件名顺序等宽、从上到下拼接，不拉伸或裁切。主图联系表保留完整图片。极长JPEG不支持时脚本报错，可以明确使用PNG或降低预览宽度，不能假称生成成功。
 

@@ -297,6 +297,66 @@ def fingerprint(args):
             'bytes': path.stat().st_size})
 
 
+def _parse_safe_area(text):
+    """top,bottom,left,right 分数，内容区为去掉四边后的矩形。"""
+    parts = [p.strip() for p in str(text).split(',')]
+    if len(parts) != 4:
+        raise ValueError('safe-area 须为 top,bottom,left,right 四个0–1分数')
+    values = [float(p) for p in parts]
+    if any(v < 0 or v >= 1 for v in values):
+        raise ValueError('safe-area 各边须在 [0,1)')
+    if values[0] + values[1] >= 1 or values[2] + values[3] >= 1:
+        raise ValueError('safe-area 对边之和须 < 1')
+    return {'top': values[0], 'bottom': values[1],
+            'left': values[2], 'right': values[3]}
+
+
+def validate_shell(args):
+    """壳须有真 alpha，且安全区内内容区透明占比达标；不达标不得作正式壳。"""
+    path = Path(args.input)
+    if not path.is_file():
+        raise ValueError(f'不是文件: {path}')
+    safe = _parse_safe_area(args.safe_area)
+    min_clear = float(args.min_clear)
+    if not 0 < min_clear <= 1:
+        raise ValueError('min-clear 须在 (0,1]')
+    with Image.open(path) as src:
+        im = ImageOps.exif_transpose(src).convert('RGBA')
+        alpha = im.getchannel('A')
+        w, h = im.size
+        left = int(round(w * safe['left']))
+        top = int(round(h * safe['top']))
+        right = int(round(w * (1 - safe['right'])))
+        bottom = int(round(h * (1 - safe['bottom'])))
+        if right - left < 8 or bottom - top < 8:
+            raise ValueError('内容区过小，检查 safe-area')
+        region = alpha.crop((left, top, right, bottom))
+        # 近全透明才算内容区可叠（允许抗锯齿边缘）
+        clear = sum(1 for a in region.getdata() if a <= 16)
+        total = region.width * region.height
+        clear_frac = clear / total if total else 0
+        has_alpha = alpha.getextrema()[0] < 255
+    ok = has_alpha and clear_frac >= min_clear
+    report({
+        'ok': ok,
+        'file': str(path.resolve()),
+        'size': [w, h],
+        'sha256': file_sha256(path),
+        'has_actual_transparency': has_alpha,
+        'safe_area': safe,
+        'content_box': [left, top, right, bottom],
+        'content_clear_fraction': round(clear_frac, 4),
+        'min_clear': min_clear,
+        'shell_alpha': 'ok' if ok else 'missing',
+        'note': '内容区须真透明可叠；不达标不得写入正式 _模板缓存 当壳。'
+                '应急挖洞仅可项目内 derived_shell，不得冒充正式壳。'
+    })
+    if not ok:
+        raise ValueError(
+            'validate-shell 未通过: 壳须有真alpha且内容区透明占比≥'
+            f'{min_clear}（当前 clear={clear_frac:.3f}, has_alpha={has_alpha}）')
+
+
 def validate_slots(args):
     """结构校验 slots.json；可选对照壳图尺寸。不判断卖点文案对错。"""
     doc = json.loads(Path(args.slots).read_text(encoding='utf-8'))
@@ -467,6 +527,11 @@ def main():
     fp = sub.add_parser('fingerprint'); fp.add_argument('input')
     vs = sub.add_parser('validate-slots'); vs.add_argument('slots')
     vs.add_argument('--shell', help='可选壳PNG，核对尺寸并输出指纹')
+    vsh = sub.add_parser('validate-shell'); vsh.add_argument('input')
+    vsh.add_argument('--safe-area', default='0.12,0.16,0.02,0.02',
+                     help='top,bottom,left,right 分数，默认头图常用值')
+    vsh.add_argument('--min-clear', type=float, default=0.80,
+                     help='内容区近透明像素最低占比，默认0.80')
     args = parser.parse_args()
     if getattr(args, 'width', 1) < 1 or getattr(args, 'columns', 1) < 1:
         raise ValueError('Width and columns must be positive.')
@@ -482,6 +547,8 @@ def main():
         fingerprint(args)
     elif args.command == 'validate-slots':
         validate_slots(args)
+    elif args.command == 'validate-shell':
+        validate_shell(args)
     else:
         # Names are the reference IDs; do not renumber to conceal missing items.
         refs = inputs(args.references); delivered = inputs(args.delivered)

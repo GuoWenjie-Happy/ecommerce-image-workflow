@@ -61,6 +61,19 @@ with tempfile.TemporaryDirectory() as tmp:
     # 模板指纹与 slots 结构校验（满长看图自检仍由人工）
     fp = json.loads(run('fingerprint', src/'01.png').stdout)
     assert re.fullmatch(r'[0-9a-f]{64}', fp['sha256'])
+    # 不透明图作壳应失败；带透明内容区应通过
+    run('validate-shell', src/'01.png', ok=False)
+    clear = Image.new('RGBA', (120, 120), (0, 0, 0, 0))
+    # 顶底栏不透明，中间透明
+    for y in range(120):
+        for x in range(120):
+            if y < 14 or y >= 100:
+                clear.putpixel((x, y), (0, 180, 0, 255))
+    clear.save(base/'shell-ok.png')
+    ok_shell = json.loads(run(
+        'validate-shell', base/'shell-ok.png',
+        '--safe-area', '0.12,0.16,0.02,0.02').stdout)
+    assert ok_shell['ok'] is True and ok_shell['shell_alpha'] == 'ok'
     slots = {'canvas': [120, 120], 'separators': [
         {'between': ['a', 'b'], 'char': '|'}], 'slots': [
         {'id': 'a', 'box': [10, 90, 50, 115], 'max_chars': 4, 'font_size': 18,
