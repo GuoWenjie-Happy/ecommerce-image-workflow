@@ -6,7 +6,7 @@ job.style来自当前执行卡的最终方案：选套后结合商品特点、�
 
 **默认生图串**：把六类观察收成短「商品核对」+ 一遍硬要求（学自观察表与保真条款，不逐条重复长文）；**不再**默认贴英文字段整表，也**不再**默认追加保真全文。商品不变主要靠 **product 附图 + 商品核对**。
 
-短「商品核对」只压缩观察表/保真长文的呈现形态，**不授权**压缩 `layout`/`constraints` 里的跨品类三件套（场景类型 + 本品环境正向 + 参考品类点名禁止）或其它执行卡硬约束；「本张装饰」只限装饰词库，不得把构图压成「同类重布」三字。
+短「商品核对」只压缩观察表/保真长文的呈现形态，**不授权**压缩或删除：跨品类三件套（场景类型 + 本品环境正向 + 参考品类点名禁止）、本张输出规格（选定比例与目标 px）、完整 `copy_units` 分位、模块数量与结构迁移要求；「本张装饰」只限装饰词库，不得把构图压成「同类重布」三字。
 
 **仓库归档（可改回）**：
 
@@ -64,6 +64,7 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
 | 检查 | 失败行为 |
 |---|---|
 | `copy` / `copy_units` 含禁词（`资料来源`、`来源：`、URL、`文案溯源`、`产品保真`、`商品保真`、`执行备注`、`准确文案`、`copy_units` 元标记等） | compose 失败 |
+| `dense_copy` 或已提供 `copy_units` 但缺完整 title/body | compose 失败；不得生图 |
 | 已有 `copy_units` | 提示词**不**再写入整段摘要，只保留上图文字分位 |
 | `uses_brand_frame: true` 但无 `safe_area` 且 layout 未写「安全区」 | 失败 |
 | `physical_scale: true` 但未写 `scale_alignment` | 失败；默认不做实物对照 |
@@ -71,8 +72,11 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
 | `icon_list: true` 但未声明 `icon_uniform: true` | 失败 |
 | `page_kind` 为信任/证明类，且 design 附图路径含证书/SGS/章面/报告暗示 | 失败并提示换附图策略 |
 | `multi_panel: true` 但缺合法 `panel_count`（≥2） | 失败 |
+| 详情缺「参考宽高比 / 候选两档 / 选定档 / 取舍理由」 | 执行纪律拦停：不得 compose、不得生图（脚本暂不自动解析四字段时，由 Agent 按制作规范第8.1节自检） |
 
-可选字段：`prop_whitelist`、`extra_chrome`、`panel_count`、`page_kind`。脚本只拦登记字段与禁词；提示词段位与白话展开由执行者按制作规范填写，不另开「提示词审核」阶段。成图对错仍看图验收。
+可选字段：`prop_whitelist`、`extra_chrome`、`panel_count`、`page_kind`。脚本只拦登记字段与禁词；提示词段位、白话展开、比例四字段与落盘非空由执行者按制作规范填写并自检，不另开「提示词审核」阶段。成图对错仍看图验收。
+
+**调用顺序硬闸**：新增营销图／返修须先 compose 写出落盘文件 → `prompt_builder.py` 读取校验 → 确认落盘非空 → 才调用生图。落盘路径不存在或为空 → 禁止调用。
 
 stage允许white、transparent、main、detail、repair。出镜商品必须附product角色图。**返修默认重生**：改执行卡后以 `main`/`detail` 再 compose（提示词文件名可用 `_返修01`），附原参考 + 产品素材即可，**不要求** `edit_target`。仅原图编辑例外用 `stage: repair` 且必须附 `edit_target`。其他角色为design和identity_check。明确不出镜时仍要附参考，product_visible为false并填absence_reason，不能生成另一种包装凑版。素材阶段不允许不出镜。
 
