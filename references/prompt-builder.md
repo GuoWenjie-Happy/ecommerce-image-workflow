@@ -6,6 +6,8 @@ job.style来自当前执行卡的最终方案：选套后结合商品特点、�
 
 **默认生图串**：把六类观察收成短「商品核对」+ 一遍硬要求（学自观察表与保真条款，不逐条重复长文）；**不再**默认贴英文字段整表，也**不再**默认追加保真全文。商品不变主要靠 **product 附图 + 商品核对**。
 
+短「商品核对」只压缩观察表/保真长文的呈现形态，**不授权**压缩 `layout`/`constraints` 里的跨品类三件套（场景类型 + 本品环境正向 + 参考品类点名禁止）或其它执行卡硬约束；「本张装饰」只限装饰词库，不得把构图压成「同类重布」三字。
+
 **仓库归档（可改回）**：
 
 - 完整六类观察表：仍写在执行卡 `identity`，规范见下表。  
@@ -72,7 +74,7 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
 
 可选字段：`prop_whitelist`、`extra_chrome`、`panel_count`、`page_kind`。脚本只拦登记字段与禁词；提示词段位与白话展开由执行者按制作规范填写，不另开「提示词审核」阶段。成图对错仍看图验收。
 
-stage允许white、transparent、main、detail、repair。出镜商品必须附product角色图；返修必须附edit_target当前编辑图。其他角色为design和identity_check。明确不出镜时仍要附参考，product_visible为false并填absence_reason，不能生成另一种包装凑版。素材阶段不允许不出镜。
+stage允许white、transparent、main、detail、repair。出镜商品必须附product角色图。**返修默认重生**：改执行卡后以 `main`/`detail` 再 compose（提示词文件名可用 `_返修01`），附原参考 + 产品素材即可，**不要求** `edit_target`。仅原图编辑例外用 `stage: repair` 且必须附 `edit_target`。其他角色为design和identity_check。明确不出镜时仍要附参考，product_visible为false并填absence_reason，不能生成另一种包装凑版。素材阶段不允许不出镜。
 
 各阶段references必须落实真实用途：白底用对应原照作product，透明底用已验收白底，营销图用匹配高清白底/透明底；source_images用于追溯商品原证据，不会自动全部附入模型。scripts只检查角色存在、路径可读，不能判断选错SKU、附图是不是已验收或角色是否写错。
 
