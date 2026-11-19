@@ -76,7 +76,7 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
 
 可选字段：`prop_whitelist`、`extra_chrome`、`panel_count`、`page_kind`。脚本只拦登记字段与禁词；提示词段位、白话展开、比例四字段与落盘非空由执行者按制作规范填写并自检，不另开「提示词审核」阶段。成图对错仍看图验收。
 
-**调用顺序硬闸**：新增营销图／返修须先 compose 写出落盘文件 → `prompt_builder.py` 读取校验 → 确认落盘非空 → 才调用生图。落盘路径不存在或为空 → 禁止调用。
+**调用顺序硬闸**：新增营销图（**主图＋详情**）／返修须先 compose 写出落盘文件 → `prompt_builder.py` 读取校验 → 确认落盘非空 → 才调用生图。落盘路径不存在或为空 → 禁止调用。主图不因固定 1:1 而免落盘或免 compose。
 
 stage允许white、transparent、main、detail、repair。出镜商品必须附product角色图。**返修默认重生**：改执行卡后以 `main`/`detail` 再 compose（提示词文件名可用 `_返修01`），附原参考 + 产品素材即可，**不要求** `edit_target`。仅原图编辑例外用 `stage: repair` 且必须附 `edit_target`。其他角色为design和identity_check。明确不出镜时仍要附参考，product_visible为false并填absence_reason，不能生成另一种包装凑版。素材阶段不允许不出镜。
 
