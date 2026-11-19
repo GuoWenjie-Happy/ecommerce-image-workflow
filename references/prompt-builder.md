@@ -2,9 +2,17 @@
 
 job.style来自当前执行卡的最终方案：选套后结合商品特点、文案主题与参考构图及色彩关系共同策划，在style_basis记录依据和配色理由，style再展开到各job，不提前锁死商品风格或直接复制参考配色。同参考多产品分别判断，不复制首个产品style，也不要求强制异色。页面特有装饰只写入适用job，视觉要求不得改写商品事实或省掉必要文案。组装器只校验和组装文本，不证明设计判断成立，决策规则见制作规范第4、7节。
 
-本流程的新增白底、透明底、营销图与返修调用使用project_files.py的compose操作。固定条款来自 [product-preservation.txt](product-preservation.txt)，由脚本原文追加；AI只填写商品观察及本张设计，不自行压缩成“只保留品牌、品名、容量”。第三方原文件不修改。
+本流程的新增白底、透明底、营销图与返修调用使用project_files.py的compose操作。AI填写商品观察及本张设计，不自行压缩成“只保留品牌、品名、容量”。
 
-## 商品观察表
+**默认生图串**：把六类观察收成短「商品核对」+ 一遍硬要求（学自观察表与保真条款，不逐条重复长文）；**不再**默认贴英文字段整表，也**不再**默认追加保真全文。商品不变主要靠 **product 附图 + 商品核对**。
+
+**仓库归档（可改回）**：
+
+- 完整六类观察表：仍写在执行卡 `identity`，规范见下表。  
+- 保真条款原文：仍保留 [product-preservation.txt](product-preservation.txt)，勿删。  
+- 测试若要恢复旧提示词形态：job/规格设 `"full_legacy_preservation_prompt": true`，compose 会再写入「整表观察 + 保真全文」（`prompt_mode: legacy_full`）。
+
+## 商品观察表（执行卡必填；默认不整表进生图串）
 
 在商品识别阶段，对照实际原图填写执行卡内的identity；白底、透明底、营销图和返修共用该产品/适用SKU的观察表。字段：
 
@@ -40,11 +48,29 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
     {"id": "R1", "title": "<短标题>", "body": "<完整说明句>"}
   ],
   "constraints": "<本张限制>",
-  "parameters": {"transparent_background": false}
+  "parameters": {"transparent_background": false},
+  "full_legacy_preservation_prompt": false
 }
 ```
 
-`dense_copy`：双列对照、多行表、四宫格及以上且每格有正文、参数表等密文页必须为 `true`，并提供非空 `copy_units`；每一项须有可上图的 `title` 与 `body`（仅短印章位可 `"title_only": true`）。缺说明时 compose **失败退出**，不得生图。非密文页可省略 `copy_units`；一旦提供则同样校验完整性。组装成功后会把分位文案与「禁止自撰」写入提示词。
+`dense_copy`：双列对照、多行表、四宫格及以上且每格有正文、参数表等密文页必须为 `true`，并提供非空 `copy_units`；每一项须有可上图的 `title` 与 `body`（仅短印章位可 `"title_only": true`）。缺说明时 compose **失败退出**，不得生图。非密文页可省略 `copy_units`；一旦提供则同样校验完整性。组装成功后写入「上图文字分位」与禁止自撰句。
+
+`identity_check`：**按需**附图，不默认每张都带第三张。
+
+### 生图前硬闸（compose 失败即停）
+
+| 检查 | 失败行为 |
+|---|---|
+| `copy` / `copy_units` 含禁词（`资料来源`、`来源：`、URL、`文案溯源`、`产品保真`、`商品保真`、`执行备注`、`准确文案`、`copy_units` 元标记等） | compose 失败 |
+| 已有 `copy_units` | 提示词**不**再写入整段摘要，只保留上图文字分位 |
+| `uses_brand_frame: true` 但无 `safe_area` 且 layout 未写「安全区」 | 失败 |
+| `physical_scale: true` 但未写 `scale_alignment` | 失败；默认不做实物对照 |
+| 未开 `physical_scale` 但 `layout` 点名硬币/直尺/钢蹦 | 失败（分级默认纯表） |
+| `icon_list: true` 但未声明 `icon_uniform: true` | 失败 |
+| `page_kind` 为信任/证明类，且 design 附图路径含证书/SGS/章面/报告暗示 | 失败并提示换附图策略 |
+| `multi_panel: true` 但缺合法 `panel_count`（≥2） | 失败 |
+
+可选字段：`prop_whitelist`、`extra_chrome`、`panel_count`、`page_kind`。脚本只拦登记字段与禁词；提示词段位与白话展开由执行者按制作规范填写，不另开「提示词审核」阶段。成图对错仍看图验收。
 
 stage允许white、transparent、main、detail、repair。出镜商品必须附product角色图；返修必须附edit_target当前编辑图。其他角色为design和identity_check。明确不出镜时仍要附参考，product_visible为false并填absence_reason，不能生成另一种包装凑版。素材阶段不允许不出镜。
 
@@ -56,7 +82,7 @@ stage允许white、transparent、main、detail、repair。出镜商品必须附p
 {"op":"compose","source":"工作文件/产品A/执行卡.json","job":"main/01","target":"工作文件/产品A/生图提示词/主图/01_初始.md"}
 ```
 
-固定块、观察表、尺寸及逐图设计被确定性组装，文件同时记录参数、来源与附图哈希，以及policy/identity/prompt哈希。参数中的prompt和referenced_image_paths由组装器提供，不允许另行覆盖；其他参数仅能填当前宿主工具实际支持的字段。尺寸只写output_spec时不是独立宽高参数，不能伪记为强制尺寸。
+商品核对（或 legacy 下的观察表+保真全文）、尺寸及逐图设计被确定性组装；快照记录参数、来源与附图哈希，以及 policy/identity/prompt 哈希与 `prompt_mode`。参数中的prompt和referenced_image_paths由组装器提供，不允许另行覆盖；其他参数仅能填当前宿主工具实际支持的字段。输出规格只写比例与像素；「无独立宽高参数」等元说明写规范不写进生图正文。
 
 ## 实际发送前
 
