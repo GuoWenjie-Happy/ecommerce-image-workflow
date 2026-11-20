@@ -95,6 +95,8 @@ python project_files.py "项目目录\工作文件\操作清单.json"
 
 `images` 按 `main/01`、`detail/02` 索引，只有 `status: passed`、`selected`明确、`delivered_from`等于该选版、`delivered`文件存在且可读，才计为当前已交付。导出成功后由执行者登记 `delivered_from`，不能在导出前预填成功。旧项目不自动猜选版来源，须先核对。
 
+`project_files.py` 在 `json` 或 `timing` 写回同时含 `plan` 和 `images` 的完整产品索引前执行状态闸门。通过图的 `review` 必须含非空 `product`、`copy`、`composition`、`completeness`、`cross_page` 和 `conclusion: passed`；单句总评不通过。`repair_attempts` 须等于 `repairs` 条数，每条返修须关联实际 `image`、`prompt_file` 和结构化 `review`。`selected` 只能指向原版或已通过返修版；交付时 `delivered_from` 必须等于 `selected`。旧索引仍可读取和生成总览；下次写回前须先补齐新契约。
+
 自动总览生成主图、详情数量和逐项异常；素材使用 `white_status/transparent_status` 及对应review登记。预览、素材模糊通过及上传限制仍须依事实补充总览；脚本成功不代表这些人工核验项已经完成。
 
 ### 一次调用批量交付

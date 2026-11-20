@@ -28,6 +28,8 @@
 
 产品索引包含 `facts_file`、`reference_set`、`style_file`、`materials`、`cards`、`images`、`stage_status`、`history`。materials逐项记录SKU、视角、source、white、transparent、检查结论和模糊位置。cards按 `main/03`、`detail/02` 记录参考原图、素材、准确文案、执行卡路径。images同键记录 original、repairs数组、selected、delivered、status、原生/交付尺寸（含是否上采样、宿主档位）、review、repair_attempts、additional_authorization；交付说明须写出原生宽高与是否上采样。路径必须真实存在才登记已完成。history记录时间、用户要求、修改项、版本和额度；删除或移动文件后不可继续声称可用。
 
+`status: passed` 的 `review` 必须是结构化对象，非空记录 `product`、`copy`、`composition`、`completeness`、`cross_page` 五类核对证据，且 `conclusion: passed`。只写“轻量通过”或总评不能登记通过。每条返修必填真实可读的 `image`、`prompt_file` 和同结构 `review`；`repair_attempts` 必须等于 `repairs` 条数。通过项的 `selected` 只能指向 `original` 或结论为 `passed` 的返修图；有交付记录时 `delivered_from` 必须与 `selected` 相同。
+
 ### 记录归并与唯一有效版本
 
 归档、JSON更新、计时和总览使用固定 [项目文件工具](../scripts/README.md#项目文件批处理)，清单与payload以文件传递。JSON更新支持按预先读取的SHA-256拒绝过期覆盖；并发产品只写自己的索引，公共写入由总控处理。阶段时间存产品索引 `stage_timings`，环境记录仅在执行环境改变或实际报错时复核。工具未执行完的批次保留成功项，不能把失败写入登记为已完成。

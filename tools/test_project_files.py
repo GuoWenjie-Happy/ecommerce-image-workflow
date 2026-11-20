@@ -11,6 +11,15 @@ script = Path(__file__).resolve().parents[1] / 'scripts' / 'project_files.py'
 
 with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)
+    def review(conclusion='passed'):
+        return {
+            'product': '已对照原图核对主体、结构、颜色与标签。',
+            'copy': '已逐项核对主标题和上图文字，无内部话术。',
+            'composition': '已核对主体尺度、标题层级和信息区域。',
+            'completeness': '未见异常空白、缺失模块或错误遮挡。',
+            'cross_page': '已并排核对字体角色和模块外壳。',
+            'conclusion': conclusion}
+
     def invoke(operations, success=True):
         manifest = root / 'request.json'
         manifest.write_text(json.dumps({'project_root': str(root), 'operations': operations}), encoding='utf-8')
@@ -89,13 +98,58 @@ with tempfile.TemporaryDirectory() as temporary:
     timing = json.loads(target.read_text(encoding='utf-8'))['stage_timings']['review']
     assert timing['elapsed_seconds'] >= 0 and timing['status'] == 'finished'
     invoke([{'op': 'json', 'target': 'project.json', 'data': {'products': [{'name': '示例产品', 'index': 'work/product.json'}]}}])
+    # 产品索引写入闸门：通过状态须有结构化审核，返修须与真实文件和选版一致。
+    Image.new('RGB', (20, 20), 'green').save(root / 'repair.png')
+    base_record = {
+        'status': 'passed',
+        'original': 'source.png',
+        'selected': 'repair.png',
+        'review': review(),
+        'repair_attempts': 1,
+        'repairs': [{
+            'image': 'repair.png',
+            'prompt_file': 'work/prompts/detail01.md',
+            'review': review()}]}
+    valid_product = {
+        'plan': {'main': ['01'], 'detail': None},
+        'images': {'main/01': base_record}}
+    invoke([{'op': 'json', 'target': 'work/valid-product.json', 'data': valid_product}])
+    one_line = json.loads(json.dumps(valid_product, ensure_ascii=False))
+    one_line['images']['main/01']['review'] = {'conclusion': 'passed', 'reason': '轻量通过'}
+    invoke([{'op': 'json', 'target': 'work/bad-one-line.json', 'data': one_line}], False)
+    missing_repair_file = json.loads(json.dumps(valid_product, ensure_ascii=False))
+    missing_repair_file['images']['main/01']['repairs'][0]['image'] = 'missing-repair.png'
+    missing_repair_file['images']['main/01']['selected'] = 'missing-repair.png'
+    invoke([{'op': 'json', 'target': 'work/bad-repair-file.json', 'data': missing_repair_file}], False)
+    wrong_count = json.loads(json.dumps(valid_product, ensure_ascii=False))
+    wrong_count['images']['main/01']['repair_attempts'] = 0
+    invoke([{'op': 'json', 'target': 'work/bad-repair-count.json', 'data': wrong_count}], False)
+    failed_selected = json.loads(json.dumps(valid_product, ensure_ascii=False))
+    failed_selected['images']['main/01']['repairs'][0]['review'] = review('needs_repair')
+    invoke([{'op': 'json', 'target': 'work/bad-selected-review.json', 'data': failed_selected}], False)
+    wrong_delivery = json.loads(json.dumps(valid_product, ensure_ascii=False))
+    wrong_delivery['images']['main/01'].update(
+        delivered='work/original.png', delivered_from='source.png')
+    invoke([{'op': 'json', 'target': 'work/bad-delivery-source.json', 'data': wrong_delivery}], False)
     # A passed record with a missing actual file must not count as delivered.
-    product = {'plan': {'main': ['01', '02'], 'detail': None}, 'images': {'main/01': {'status': 'passed', 'selected': 'source.png', 'delivered_from': 'source.png', 'delivered': 'work/original.png'}, 'main/02': {'status': 'passed', 'delivered': 'missing.png'}}}
+    product = {
+        'plan': {'main': ['01', '02'], 'detail': None},
+        'images': {
+            'main/01': {
+                'status': 'passed', 'original': 'source.png', 'selected': 'source.png',
+                'delivered_from': 'source.png', 'delivered': 'work/original.png',
+                'review': review(), 'repair_attempts': 0, 'repairs': []},
+            'main/02': {
+                'status': 'passed', 'original': 'source.png', 'selected': 'source.png',
+                'delivered_from': 'source.png', 'delivered': 'missing.png',
+                'review': review(), 'repair_attempts': 0, 'repairs': []}}}
     invoke([{'op': 'json', 'target': 'work/product.json', 'data': product, 'replace': True}, {'op': 'overview', 'project': 'project.json', 'target': '交付/交付总览.md'}])
     overview = (root / '交付/交付总览.md').read_text(encoding='utf-8')
     assert '1/2' in overview and '不在范围' in overview and '02' in overview and '文件不存在' in overview
+    # 总览仍能识别由旧工具或外部写入留下的不一致记录。
     product['images']['main/01']['delivered_from'] = 'old-version.png'
-    invoke([{'op': 'json', 'target': 'work/product.json', 'data': product, 'replace': True}, {'op': 'overview', 'project': 'project.json', 'target': '交付/交付总览.md', 'replace': True}])
+    target.write_text(json.dumps(product, ensure_ascii=False), encoding='utf-8')
+    invoke([{'op': 'overview', 'project': 'project.json', 'target': '交付/交付总览.md', 'replace': True}])
     assert '0/2' in (root / '交付/交付总览.md').read_text(encoding='utf-8')
     invoke([{'op': 'environment', 'target': 'work/environment.json'}])
     environment = json.loads((root / 'work/environment.json').read_text(encoding='utf-8'))

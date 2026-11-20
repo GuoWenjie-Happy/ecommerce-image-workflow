@@ -24,11 +24,16 @@ with tempfile.TemporaryDirectory() as tmp:
     a = run(spec, 'prompts/main01.md')
     text = (root/'prompts/main01.md').read_text(encoding='utf-8')
     body = text.split('\n\n## 完整提示词原文\n\n', 1)[1]
-    assert '商品核对' in body and '不猜写' in body
+    assert '商品核对' in body and '商品以 product 附图为唯一形态依据' in body
     assert '包装与本体文字' in body
     assert '须按附图原样保留' not in body  # 短版：硬要求不逐条重复
     assert 'shape_proportions' not in body  # 默认不把英文字段名塞进生图串
     assert '商品保真固定条款' not in body  # 默认不贴保真全文
+    # 默认生图串只描述目标画面；内部限制和通用禁止句不进入提示词。
+    assert '本张限制' not in body and '不增加道具' not in body
+    assert all(marker not in body for marker in (
+        '禁止', '不得', '不要', '不猜写', '不新增', '不补看不见'))
+    assert '画面文字完整范围' in body
     assert json.loads(a.stdout)['result']['prompt_mode'] == 'identity_brief'
     b = run(spec, 'prompts/main02.md')
     assert json.loads(a.stdout)['result']['prompt_sha256'] == json.loads(b.stdout)['result']['prompt_sha256']
@@ -38,7 +43,8 @@ with tempfile.TemporaryDirectory() as tmp:
     request = json.loads(read.stdout)
     assert request['prompt'] == body
     assert request['referenced_image_paths'] == [str((root/'product.png').resolve())]
-    (root/'prompts/tampered.md').write_text(text.replace('不猜写', '可以猜写'), encoding='utf-8')
+    (root/'prompts/tampered.md').write_text(
+        text.replace('唯一形态依据', '可选形态依据'), encoding='utf-8')
     bad = subprocess.run([sys.executable, str(reader), str(root/'prompts/tampered.md')], capture_output=True)
     assert bad.returncode != 0
     # 归档开关：可恢复「整表观察+保真全文」入提示词
@@ -77,9 +83,9 @@ with tempfile.TemporaryDirectory() as tmp:
     dense['copy'] = '不够甜香｜担心口感寡淡。大小混装｜担心大果小果。'
     ok_dense = run(dense, 'prompts/detail02.md')
     dense_text = (root/'prompts/detail02.md').read_text(encoding='utf-8')
-    assert '担心不够甜不够香' in dense_text and '禁止自撰' in dense_text
+    assert '担心不够甜不够香' in dense_text and '画面文字范围' in dense_text
     assert '见下方分位' in dense_text
-    assert '上图文字分位' in dense_text
+    assert '画面文字分位' in dense_text
     assert '担心口感寡淡' not in dense_text  # 有分位则不双写摘要
     assert json.loads(ok_dense.stdout)['result']['prompt_sha256']
     # 成图禁词与套框/对照/多窗硬闸
@@ -88,6 +94,109 @@ with tempfile.TemporaryDirectory() as tmp:
     run(banned, 'bad-source.md', False)
     banned['copy'] = '产品保真2300m产地'
     run(banned, 'bad-fidelity.md', False)
+    negative_style = copy.deepcopy(spec)
+    negative_style['style'] = '浅色背景，禁止使用蓝色'
+    run(negative_style, 'bad-negative-style.md', False)
+    negative_layout = copy.deepcopy(spec)
+    negative_layout['layout'] = '完整商品居中，不要纸箱'
+    run(negative_layout, 'bad-negative-layout.md', False)
+    negative_output = copy.deepcopy(spec)
+    negative_output['output_spec'] = '1000×1000px，禁止裁切'
+    run(negative_output, 'bad-negative-output.md', False)
+    negative_identity = copy.deepcopy(spec)
+    negative_identity['identity']['fields']['structure']['description'] = '不要增加纸箱'
+    run(negative_identity, 'bad-negative-identity.md', False)
+    absent = copy.deepcopy(spec)
+    absent['product_visible'] = False
+    absent['absence_reason'] = '内部素材缺口：没有包装实拍'
+    absent['layout'] = '三张信息卡组成的箱装发货示意页'
+    run(absent, 'prompts/main-absent.md')
+    absent_text = (root/'prompts/main-absent.md').read_text(encoding='utf-8')
+    assert '内部素材缺口' not in absent_text and '没有包装实拍' not in absent_text
+    assert '商品出镜：否。' in absent_text
+    internal = copy.deepcopy(spec)
+    internal['internal_notes'] = '资料仅支持产区名称，没有真章图资产。'
+    run(internal, 'prompts/main-internal-notes.md')
+    internal_text = (root/'prompts/main-internal-notes.md').read_text(encoding='utf-8')
+    assert '没有真章图资产' not in internal_text
+    for i, process_copy in enumerate((
+            '地理标志产区名称可成立表述，无章图贴图',
+            '文案可写产区名称，画面禁止仿官方章',
+            '无包装实拍，以线框图示意')):
+        leaked = copy.deepcopy(spec)
+        leaked['copy'] = process_copy
+        run(leaked, f'bad-process-copy-{i}.md', False)
+    leaked_unit = copy.deepcopy(spec)
+    leaked_unit['copy_units'] = [{
+        'id': 'A1', 'title': '箱装发货', 'body': '无包装实拍，以线框图示意'}]
+    run(leaked_unit, 'bad-process-copy-unit.md', False)
+    # 产品级插画系统：页面只能继承已锁定的 style_id。
+    illustrated = copy.deepcopy(spec)
+    illustrated['identity']['illustration_system'] = {
+        'scope': 'product',
+        'style_id': 'flat_sticker',
+        'style_source': 'detail/11',
+        'palette': '红、米白、深色描边',
+        'outline': '统一粗描边和圆角图标',
+        'shading': '少量平涂阴影',
+        'shared_shell': '示意页共享信息卡外壳'}
+    illustrated['illustration_style_id'] = 'flat_sticker'
+    run(illustrated, 'prompts/detail-illustrated.md')
+    illustrated_text = (root/'prompts/detail-illustrated.md').read_text(encoding='utf-8')
+    assert '产品级插画系统' in illustrated_text and 'flat_sticker' in illustrated_text
+    mismatched = copy.deepcopy(illustrated)
+    mismatched['illustration_style_id'] = 'engineering_line'
+    run(mismatched, 'bad-illustration-style.md', False)
+    negative_illustration = copy.deepcopy(illustrated)
+    negative_illustration['identity']['illustration_system']['shading'] = '禁止纪实光影'
+    run(negative_illustration, 'bad-negative-illustration.md', False)
+    missing_system = copy.deepcopy(spec)
+    missing_system['illustration_style_id'] = 'flat_sticker'
+    run(missing_system, 'bad-illustration-system.md', False)
+    # 结构化区域替代自由 layout，不得重复准确文案。
+    regions = copy.deepcopy(spec)
+    regions['layout'] = '这段旧的模糊构图不应进入提示词'
+    regions['layout_regions'] = [
+        {'role': 'title_area', 'position': 'top', 'height': '25%',
+         'background': '浅色场景，轻微暗化', 'content_role': '主标题与副标题'},
+        {'role': 'hero', 'position': 'center_lower', 'content_role': '商品主体'}]
+    run(regions, 'prompts/main-regions.md')
+    regions_text = (root/'prompts/main-regions.md').read_text(encoding='utf-8')
+    assert '结构化构图区域' in regions_text
+    assert '这段旧的模糊构图不应进入提示词' not in regions_text
+    duplicate_role = copy.deepcopy(regions)
+    duplicate_role['layout_regions'][1]['role'] = 'title_area'
+    run(duplicate_role, 'bad-region-role.md', False)
+    missing_region_field = copy.deepcopy(regions)
+    del missing_region_field['layout_regions'][0]['content_role']
+    run(missing_region_field, 'bad-region-field.md', False)
+    invalid_percentage = copy.deepcopy(regions)
+    invalid_percentage['layout_regions'][0]['height'] = '125%'
+    run(invalid_percentage, 'bad-region-percentage.md', False)
+    duplicated_copy = copy.deepcopy(regions)
+    duplicated_copy['layout_regions'][0]['content_role'] = '主标题：测试文字'
+    run(duplicated_copy, 'bad-region-copy.md', False)
+    negative_region = copy.deepcopy(regions)
+    negative_region['layout_regions'][0]['background'] = '浅色场景，禁止蓝色'
+    run(negative_region, 'bad-negative-region.md', False)
+    # 唯一允许的负向边界：绑定本次实际 design 参考图中的具体元素。
+    Image.new('RGB', (20, 20), 'orange').save(root/'design.png')
+    exclusions = copy.deepcopy(spec)
+    exclusions['references'].append({'path': 'design.png', 'role': 'design'})
+    exclusions['reference_exclusions'] = [{
+        'reference': 'design.png',
+        'elements': ['橙子', '原品牌包装']}]
+    run(exclusions, 'prompts/main-reference-exclusions.md')
+    exclusions_text = (root/'prompts/main-reference-exclusions.md').read_text(encoding='utf-8')
+    assert '参考图使用边界' in exclusions_text
+    assert '输入图2' in exclusions_text and '橙子、原品牌包装不继承' in exclusions_text
+    unbound_exclusion = copy.deepcopy(spec)
+    unbound_exclusion['reference_exclusions'] = [{
+        'reference': 'product.png', 'elements': ['纸箱']}]
+    run(unbound_exclusion, 'bad-unbound-exclusion.md', False)
+    malformed_exclusion = copy.deepcopy(exclusions)
+    malformed_exclusion['reference_exclusions'] = ['禁止橙子']
+    run(malformed_exclusion, 'bad-malformed-exclusion.md', False)
     framed = copy.deepcopy(spec)
     framed['uses_brand_frame'] = True
     run(framed, 'bad-frame.md', False)

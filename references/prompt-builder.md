@@ -4,9 +4,11 @@ job.style来自当前执行卡的最终方案：选套后结合商品特点、�
 
 本流程的新增白底、透明底、营销图与返修调用使用project_files.py的compose操作。AI填写商品观察及本张设计，不自行压缩成“只保留品牌、品名、容量”。
 
+`copy` 与 `copy_units` 是唯一允许进入「画面文字」的字段。`internal_notes` 只保存资料判断和素材缺口；`constraints` 只保存审核与执行限制。两者都不进入默认生图提示词。风格、构图、商品观察、输出规格和插画系统只写正向目标；出现“禁止、不得、不要、严禁、避免、不能、不可”等负向指令时 compose 失败，要求改写正向画面结果。
+
 **默认生图串**：把六类观察收成短「商品核对」+ 一遍硬要求（学自观察表与保真条款，不逐条重复长文）；**不再**默认贴英文字段整表，也**不再**默认追加保真全文。商品不变主要靠 **product 附图 + 商品核对**。
 
-短「商品核对」只压缩观察表/保真长文的呈现形态，**不授权**压缩或删除：跨品类三件套（场景类型 + 本品环境正向 + 参考品类点名禁止）、本张输出规格（选定比例与目标 px）、完整 `copy_units` 分位、模块数量与结构迁移要求；「本张装饰」只限装饰词库，不得把构图压成「同类重布」三字。
+短「商品核对」只压缩观察表/保真长文的呈现形态，**不授权**压缩或删除：跨品类场景类型与本品环境正向、本张输出规格（选定比例与目标 px）、完整 `copy_units` 分位、模块数量与结构迁移要求。只有当本次实际 `design` 参考图中已存在错误品类、原品牌或证明元素，且正向范围仍无法清楚排除时，才可用 `reference_exclusions` 绑定该参考图的具体元素。
 
 **仓库归档（可改回）**：
 
@@ -31,6 +33,8 @@ job.style来自当前执行卡的最终方案：选套后结合商品特点、�
 
 identity还须有product_id和非空source_images（原商品证据图路径），脚本校验文件可读并记录哈希。独立测试可重新看原图填写，但固定条款和六类检查项不得弱化；这不强制复用上一轮所有成果，不改变完整重跑授权范围。
 
+示意页还须在产品层 `identity.illustration_system` 锁定唯一插画系统，并在页面写同值 `illustration_style_id`。系统必填 `scope: "product"`、`style_id`、`style_source`、`palette`、`outline`、`shading` 和 `shared_shell`。页面模式与产品模式不一致时 compose 失败；非示意页无需引用。
+
 ## 组装清单
 
 执行卡可集中存 `identity` 和按main/01、detail/02等索引的 `jobs`，各job包含下列内容；也支持source直接指向单张完整规格对象。
@@ -43,19 +47,30 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
   "references": [{"path":"<真实商品素材路径>","role":"product"},{"path":"<本张原参考路径>","role":"design"}],
   "style": "<本产品风格>",
   "layout": "<本张完整构图>",
+  "layout_regions": [
+    {"role":"title_area","position":"top","height":"25%","background":"<背景承载>","content_role":"主标题与副标题"},
+    {"role":"hero","position":"center_lower","content_role":"商品主体"}
+  ],
   "copy": "<全部准确新增文案摘要；无字时明确写无新增文案>",
   "dense_copy": false,
   "copy_units": [
     {"id": "L1", "title": "<短标题>", "body": "<完整说明句>"},
     {"id": "R1", "title": "<短标题>", "body": "<完整说明句>"}
   ],
-  "constraints": "<本张限制>",
+  "constraints": "<只供执行与审核，不进提示词>",
+  "reference_exclusions": [
+    {"reference":"<本次已附加的design参考图>","elements":["<附图中已存在的具体元素>"]}
+  ],
   "parameters": {"transparent_background": false},
   "full_legacy_preservation_prompt": false
 }
 ```
 
-`dense_copy`：双列对照、多行表、四宫格及以上且每格有正文、参数表等密文页必须为 `true`，并提供非空 `copy_units`；每一项须有可上图的 `title` 与 `body`（仅短印章位可 `"title_only": true`）。缺说明时 compose **失败退出**，不得生图。非密文页可省略 `copy_units`；一旦提供则同样校验完整性。组装成功后写入「上图文字分位」与禁止自撰句。
+`layout_regions` 与自由 `layout` 二选一；一旦提供区域，compose 只组装区域，不再写入旧 `layout`。每个区域必须有唯一 `role`、`position` 和 `content_role`；`height`/`width`/`area` 若填必须是 0% 到 100% 的百分比。区域只定义位置、面积、背景与内容角色，不得重复 `copy` 或 `copy_units` 中的准确文字。应修改执行卡后重新 compose，不在旧提示词末尾追加局部补丁。
+
+`reference_exclusions` 可省略，正常首次生成与默认返修一般为空。每项 `reference` 必须指向本次 `references` 中真实附加的 `design` 图，`elements` 只列该图已经存在且容易被照搬的具体元素。通用错误、审核标准、素材缺口、历史失败和未出现的假设对象不得写入。
+
+`dense_copy`：双列对照、多行表、四宫格及以上且每格有正文、参数表等密文页必须为 `true`，并提供非空 `copy_units`；每一项须有可上图的 `title` 与 `body`（仅短印章位可 `"title_only": true`）。缺说明时 compose **失败退出**，不得生图。非密文页可省略 `copy_units`；一旦提供则同样校验完整性。组装成功后写入「画面文字分位」，并用正向句说明该分位是画面文字完整集合。
 
 `identity_check`：**按需**附图，不默认每张都带第三张。
 
@@ -63,7 +78,7 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
 
 | 检查 | 失败行为 |
 |---|---|
-| `copy` / `copy_units` 含禁词（`资料来源`、`来源：`、URL、`文案溯源`、`产品保真`、`商品保真`、`执行备注`、`准确文案`、`copy_units` 元标记等） | compose 失败 |
+| `copy` / `copy_units` 含禁词（`资料来源`、`来源：`、URL、`文案溯源`、`产品保真`、`商品保真`、`执行备注`、`准确文案`、`copy_units` 元标记，以及“可成立表述”“无章图贴图”“文案可写”“画面禁止”“无包装实拍”“以线框图示意”等过程话术） | compose 失败 |
 | `dense_copy` 或已提供 `copy_units` 但缺完整 title/body | compose 失败；不得生图 |
 | 已有 `copy_units` | 提示词**不**再写入整段摘要，只保留上图文字分位 |
 | `uses_brand_frame: true` 但无 `safe_area` 且 layout 未写「安全区」 | 失败 |
@@ -72,13 +87,17 @@ identity还须有product_id和非空source_images（原商品证据图路径）�
 | `icon_list: true` 但未声明 `icon_uniform: true` | 失败 |
 | `page_kind` 为信任/证明类，且 design 附图路径含证书/SGS/章面/报告暗示 | 失败并提示换附图策略 |
 | `multi_panel: true` 但缺合法 `panel_count`（≥2） | 失败 |
+| 示意页缺产品级插画系统，或 `illustration_style_id` 不一致 | 失败 |
+| `layout_regions` 缺必填字段、角色重复、百分比非法或重复准确文案 | 失败 |
+| 会进入提示词的 style/layout/output_spec/商品观察/插画系统/区域字段含负向指令 | 失败；改写为正向画面结果 |
+| `reference_exclusions` 未绑定本次实际 design 参考图，或未列具体元素 | 失败 |
 | 详情缺「参考宽高比 / 候选两档 / 选定档 / 取舍理由」 | 执行纪律拦停：不得 compose、不得生图（脚本暂不自动解析四字段时，由 Agent 按制作规范第8.1节自检） |
 
 可选字段：`prop_whitelist`、`extra_chrome`、`panel_count`、`page_kind`。脚本只拦登记字段与禁词；提示词段位、白话展开、比例四字段与落盘非空由执行者按制作规范填写并自检，不另开「提示词审核」阶段。成图对错仍看图验收。
 
 **调用顺序硬闸**：新增营销图（**主图＋详情**）／返修须先 compose 写出落盘文件 → `prompt_builder.py` 读取校验 → 确认落盘非空 → 才调用生图。落盘路径不存在或为空 → 禁止调用。主图不因固定 1:1 而免落盘或免 compose。
 
-stage允许white、transparent、main、detail、repair。出镜商品必须附product角色图。**返修默认重生**：改执行卡后以 `main`/`detail` 再 compose（提示词文件名可用 `_返修01`），附原参考 + 产品素材即可，**不要求** `edit_target`。仅原图编辑例外用 `stage: repair` 且必须附 `edit_target`。其他角色为design和identity_check。明确不出镜时仍要附参考，product_visible为false并填absence_reason，不能生成另一种包装凑版。素材阶段不允许不出镜。
+stage允许white、transparent、main、detail、repair。出镜商品必须附product角色图。**返修默认重生**：改执行卡后以 `main`/`detail` 再 compose（提示词文件名可用 `_返修01`），附原参考 + 产品素材即可，**不要求** `edit_target`。仅用户明确要求原图编辑时使用 `stage: repair` 并附 `edit_target`。其他角色为design和identity_check。明确不出镜时仍要附参考，product_visible为false并填absence_reason；absence_reason只留执行卡，compose 只输出“商品出镜：否”与正向页面主体。素材阶段不允许不出镜。
 
 各阶段references必须落实真实用途：白底用对应原照作product，透明底用已验收白底，营销图用匹配高清白底/透明底；source_images用于追溯商品原证据，不会自动全部附入模型。scripts只检查角色存在、路径可读，不能判断选错SKU、附图是不是已验收或角色是否写错。
 

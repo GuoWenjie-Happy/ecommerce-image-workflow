@@ -35,6 +35,28 @@ for phrase in (
 ):
     assert phrase in workflow, phrase
 
+skill = (root / 'SKILL.md').read_text(encoding='utf-8')
+prompts = (root / 'references' / 'prompts.md').read_text(encoding='utf-8')
+for phrase in (
+    '`internal_notes` 只记资料判断与素材缺口',
+    '产品级 `illustration_system`',
+    '`layout_regions`',
+    '不得向旧提示词末尾追加',
+    '`product`、`copy`、`composition`、`completeness`、`cross_page`',
+    '`repair_attempts` 必须等于 `repairs` 条数',
+    '`constraints` 只留在执行卡和审核记录',
+    '`reference_exclusions`',
+    '默认返修只改正向目标后重新 compose',
+):
+    assert phrase in workflow, phrase
+for phrase in (
+    '产品级 `illustration_system`',
+    '默认返修修改执行卡的正向目标后重新 compose',
+    '结构化审核',
+):
+    assert phrase in skill, phrase
+assert '不在旧提示词末尾追加局部补丁' in prompts
+
 first_party = [
     root / 'README.md',
     root / 'SKILL.md',
@@ -48,4 +70,4 @@ for path in first_party:
     content = path.read_text(encoding='utf-8')
     assert 'NumPy' not in content and 'numpy' not in content, path
 
-print('PASS: release, product-content, dependency and white-material policies are complete.')
+print('PASS: release, product-content, prompt, review-state, dependency and white-material policies are complete.')

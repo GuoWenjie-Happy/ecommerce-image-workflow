@@ -74,6 +74,86 @@ def encode(data):
     return (json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8')
 
 
+REVIEW_EVIDENCE_FIELDS = (
+    'product', 'copy', 'composition', 'completeness', 'cross_page')
+REVIEW_CONCLUSIONS = ('passed', 'needs_repair', 'not_delivered')
+
+
+def validate_review(review, field):
+    if not isinstance(review, dict):
+        raise ValueError(f'{field} 须为结构化审核对象')
+    for key in REVIEW_EVIDENCE_FIELDS:
+        value = review.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f'{field}.{key} 须记录非空核对证据')
+    if review.get('conclusion') not in REVIEW_CONCLUSIONS:
+        raise ValueError(
+            f'{field}.conclusion 须为 passed、needs_repair 或 not_delivered')
+
+
+def validate_product_state(root, data):
+    """完整产品索引的写入闸门；普通 JSON 不受影响。"""
+    if not (isinstance(data, dict) and 'plan' in data and 'images' in data):
+        return
+    images = data['images']
+    if not isinstance(images, dict):
+        raise ValueError('Product images must be an object')
+    for image_id, record in images.items():
+        if not isinstance(record, dict):
+            raise ValueError(f'images.{image_id} 须为对象')
+        status = record.get('status')
+        review = record.get('review')
+        if status == 'passed':
+            validate_review(review, f'images.{image_id}.review')
+            if review['conclusion'] != 'passed':
+                raise ValueError(f'images.{image_id} 状态通过但审核结论不是 passed')
+
+        repairs = record.get('repairs', [])
+        attempts = record.get('repair_attempts', 0)
+        if not isinstance(repairs, list):
+            raise ValueError(f'images.{image_id}.repairs 须为数组')
+        if type(attempts) is not int or attempts < 0 or attempts != len(repairs):
+            raise ValueError(
+                f'images.{image_id}.repair_attempts 须等于 repairs 的实际记录数')
+
+        repair_by_image = {}
+        for index, repair in enumerate(repairs):
+            field = f'images.{image_id}.repairs[{index}]'
+            if not isinstance(repair, dict):
+                raise ValueError(f'{field} 须为对象')
+            for key in ('image', 'prompt_file'):
+                value = repair.get(key)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(f'{field}.{key} 必填')
+                path = local(root, value)
+                if not path.is_file():
+                    raise ValueError(f'{field}.{key} 文件不存在：{value}')
+                if key == 'image':
+                    try:
+                        with Image.open(path) as image:
+                            image.verify()
+                    except OSError as exc:
+                        raise ValueError(f'{field}.image 不是可读图片') from exc
+            validate_review(repair.get('review'), f'{field}.review')
+            repair_by_image[repair['image']] = repair
+
+        selected = record.get('selected')
+        if status == 'passed':
+            if not isinstance(selected, str) or not selected.strip():
+                raise ValueError(f'images.{image_id}.selected 是通过状态必填项')
+            original = record.get('original')
+            if selected != original and selected not in repair_by_image:
+                raise ValueError(f'images.{image_id}.selected 必须指向原版或已登记返修版')
+            if (selected in repair_by_image
+                    and repair_by_image[selected]['review']['conclusion'] != 'passed'):
+                raise ValueError(f'images.{image_id}.selected 指向未通过的返修版')
+
+        if 'delivered' in record or 'delivered_from' in record:
+            if status != 'passed' or record.get('delivered_from') != selected:
+                raise ValueError(
+                    f'images.{image_id}.delivered_from 须等于当前通过选版 selected')
+
+
 def input_path(root, value):
     path = Path(value)
     return path.resolve(strict=True) if path.is_absolute() else local(root, value).resolve(strict=True)
@@ -237,6 +317,7 @@ def execute(root, op):
                 entry.update(ended_at=ended, status='finished', elapsed_seconds=(datetime.fromisoformat(ended) - datetime.fromisoformat(entry['started_at'])).total_seconds())
             else:
                 raise ValueError('Timing action must be start or finish')
+            validate_product_state(root, data)
             atomic(target, encode(data))
         else:
             if target.exists() and not op.get('replace', False):
@@ -264,6 +345,7 @@ def execute(root, op):
                     raise ValueError('JSON mode must be replace or merge')
                 if mode == 'merge':
                     data = merge(read_json(target), data)
+                validate_product_state(root, data)
                 atomic(target, encode(data))
             elif kind == 'inventory':
                 data = inventory(root, op['source'])
