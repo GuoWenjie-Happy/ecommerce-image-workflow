@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import sys
 from project_files import atomic, encode, lock, now, read_json
-from reference_cache import prepare
+from reference_cache import prepare, relative_location
 
 PAGE_FIELDS = ('content', 'purchase_task', 'expression', 'image_text_relation',
                'composition', 'transfer', 'uncertainties')
@@ -65,9 +65,12 @@ def build(request):
                              'fingerprint': record['fingerprint'],
                              'duplicate_ids': record['duplicate_ids']}
                       for kind, record in prepared['categories'].items()}
-        rows.append({'suite': suite.relative_to(root).as_posix(), 'cache': prepared['cache'],
+        for entry in categories.values():
+            entry['analysis_file'], entry['analysis_file_external'] = relative_location(Path(entry['analysis_file']), root)
+        cache_path, cache_external = relative_location(Path(prepared['cache']), root)
+        rows.append({'suite': suite.relative_to(root).as_posix(), 'cache': cache_path, 'cache_external': cache_external,
                      'categories': categories})
-    catalog = {'schema_version': 1, 'source': str(root), 'checked_at': now(),
+    catalog = {'schema_version': 2, 'source': '.', 'path_base': 'reference_library', 'checked_at': now(),
                'scope': 'manifest_sets', 'suites': rows}
     output = root/'_公共参考'
     if not output.resolve().is_relative_to(root):
@@ -75,6 +78,7 @@ def build(request):
     with lock(output/'选套索引.json'):
         atomic(output/'选套索引.json', encode(catalog))
         lines = ['# 参考选套索引', '', '由各套系分析汇总；ready仅表示记录结构和指纹有效，不证明AI观察正确。', '',
+                 '路径相对于当前参考库根目录（本文件所在_公共参考目录的上一级）；外置缓存须另行提供。', '',
                  '范围以本次清单为准；未登记套系不在此索引内。', '']
         for row in rows:
             lines += ['## '+row['suite'], '']

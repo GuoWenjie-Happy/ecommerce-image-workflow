@@ -1,6 +1,7 @@
 """Ensure mandatory preservation instructions survive prompt assembly."""
 import copy
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -43,6 +44,34 @@ with tempfile.TemporaryDirectory() as tmp:
     request = json.loads(read.stdout)
     assert request['prompt'] == body
     assert request['referenced_image_paths'] == [str((root/'product.png').resolve())]
+    # Relocation never edits the archived request, and still verifies image bytes.
+    with tempfile.TemporaryDirectory() as moved_tmp:
+        moved = Path(moved_tmp)/'project'
+        shutil.copytree(root, moved)
+        from_path = str(root/'prompts/main01.md')
+        sys.path.insert(0, str(script.parent))
+        from prompt_builder import load_request
+        snapshot = moved/'prompts/main01.md'
+        before = snapshot.read_bytes()
+        portable = load_request(snapshot, project_root=moved)
+        assert portable['referenced_image_paths'] == [str((moved/'product.png').resolve())]
+        assert portable['prompt'] == body and snapshot.read_bytes() == before
+        legacy_metadata, legacy_body = text.split('\n\n## 完整提示词原文\n\n', 1)
+        prefix, metadata_json = legacy_metadata.split('组装依据及真实参数：\n', 1)
+        metadata = json.loads(metadata_json)
+        for item in metadata['source_evidence'] + metadata['reference_evidence']:
+            item.pop('project_path', None)
+        legacy_snapshot = moved/'prompts/legacy-paths.md'
+        legacy_snapshot.write_text(prefix+'组装依据及真实参数：\n'+json.dumps(metadata)+'\n\n## 完整提示词原文\n\n'+legacy_body, encoding='utf-8')
+        mapped = load_request(legacy_snapshot, path_mappings=[{'from': str(root), 'to': str(moved)}])
+        assert mapped['referenced_image_paths'] == portable['referenced_image_paths']
+        Image.new('RGB', (20, 20), 'blue').save(moved/'product.png')
+        try:
+            load_request(snapshot, project_root=moved)
+            raise AssertionError('Changed moved evidence accepted')
+        except ValueError as exc:
+            assert 'evidence changed' in str(exc)
+        assert snapshot.read_bytes() == before
     (root/'prompts/tampered.md').write_text(
         text.replace('唯一形态依据', '可选形态依据'), encoding='utf-8')
     bad = subprocess.run([sys.executable, str(reader), str(root/'prompts/tampered.md')], capture_output=True)

@@ -3,7 +3,7 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import sys
 import tempfile
 from PIL import Image
@@ -13,6 +13,32 @@ from project_files import atomic, digest, encode, lock, now, read_json
 
 def fingerprint(data):
     return hashlib.sha256(encode(data)).hexdigest()
+
+
+def relative_location(path, base):
+    """Keep portable links when possible; cross-drive overrides stay explicit."""
+    try:
+        return Path(os.path.relpath(path, base)).as_posix(), False
+    except ValueError:
+        return str(path), True
+
+
+def validate_legacy_relocation(index, root):
+    """Only adopt a relocated legacy cache when all recorded sources still match."""
+    count = 0
+    for record in index.get('categories', {}).values():
+        files = record.get('files', [])
+        if not files or record.get('fingerprint') != fingerprint({'files': files, 'contact_sheet_version': 1}):
+            raise ValueError('Legacy relocation needs a valid source inventory')
+        for entry in files:
+            value = entry['path']
+            relative = Path(value.replace('\\', '/'))
+            path = (root/relative).resolve()
+            if relative.is_absolute() or PureWindowsPath(value).is_absolute() or not path.is_relative_to(root) or not path.is_file() or digest(path) != entry['sha256']:
+                raise ValueError('Legacy relocation source differs or is missing; verify suite mapping before migration')
+            count += 1
+    if not count:
+        raise ValueError('Cannot relocate empty legacy cache')
 
 
 def changes(before, after):
@@ -73,12 +99,22 @@ def prepare(spec):
     with lock(index_path):
         if index_path.exists():
             index = read_json(index_path)
-            if index.get('source') != str(root) or index.get('schema_version') != 1:
+            version = index.get('schema_version')
+            if version == 1:
+                if index.get('source') != str(root):
+                    validate_legacy_relocation(index, root)
+            elif version == 2 and index.get('source_base') == 'cache_directory':
+                source = index['source']
+                if not index.get('source_external') and (Path(source).is_absolute() or PureWindowsPath(source).is_absolute()):
+                    raise ValueError('Relative cache source cannot be absolute')
+                if (cache/source).resolve() != root:
+                    raise ValueError('Cache belongs to another source')
+            else:
                 raise ValueError('Cache belongs to another source or schema')
         else:
             if any((cache/name).exists() for name in ('main_overview.jpg', 'detail_overview.jpg')):
                 raise ValueError('Unregistered preview files exist; refusing to overwrite')
-            index = {'schema_version': 1, 'source': str(root), 'categories': {}}
+            index = {'categories': {}}
         results = {}
         for kind, folder in folders.items():
             paths = sorted((p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in ecom_files.EXTENSIONS and not p.is_relative_to(cache)), key=ecom_files.natural)
@@ -120,7 +156,11 @@ def prepare(spec):
                       **analysis_state(analysis, previous, files, token, rules)}
             index['categories'][kind] = record
             results[kind] = {**record, 'updated': updated}
-        index['cache_location'] = {'default': str(default_cache), 'actual': str(cache), 'override': location_reason}
+        source, source_external = relative_location(root, cache)
+        actual, actual_external = relative_location(cache, root)
+        index.update(schema_version=2, source=source, source_base='cache_directory', source_external=source_external)
+        index['cache_location'] = {'path_base': 'suite', 'default': '_参考缓存', 'actual': actual,
+                                   'actual_external': actual_external, 'override': location_reason}
         index['checked_at'] = now()
         atomic(index_path, encode(index))
     return {'source': str(root), 'cache': str(cache), 'cache_location': index['cache_location'], 'status': 'completed', 'categories': results}

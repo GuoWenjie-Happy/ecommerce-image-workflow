@@ -53,19 +53,23 @@
 
 `模板索引.json` 最少字段示例：
 
+内部路径相对模板根目录（_模板缓存的上一级），不相对项目或命令工作目录；项目template指针单独定位。整份模板搬家后核验内容指纹复用，旧路径按制作规范第2节用index_paths.py迁移，不因换位置重生成slots。
+
 ```json
 {
+  "schema_version": 2,
+  "path_base": "template",
   "status": "passed",
-  "cache": "本项目模板/_模板缓存",
+  "cache": "_模板缓存",
   "scope": ["main/01"],
-  "shell": {"path": "本项目模板/头图品牌框/头图品牌框.png", "sha256": "…"},
-  "example": {"path": "本项目模板/头图品牌框/头图品牌框-示意.png", "sha256": "…"},
+  "shell": {"path": "头图品牌框/头图品牌框.png", "sha256": "…"},
+  "example": {"path": "头图品牌框/头图品牌框-示意.png", "sha256": "…"},
   "frame_selling_points": true,
   "safe_area": {"top": 0.12, "bottom": 0.16, "left": 0.02, "right": 0.02},
-  "slots": "本项目模板/_模板缓存/头图品牌框.slots.json",
-  "slots_self_check": "本项目模板/_模板缓存/slots_满长自检.png",
+  "slots": "_模板缓存/头图品牌框.slots.json",
+  "slots_self_check": "_模板缓存/slots_满长自检.png",
   "brand_on_shell": "好生活 选林草",
-  "report": "本项目模板/_模板缓存/模板前置.md",
+  "report": "_模板缓存/模板前置.md",
   "updated_at": "2026-11-18T00:00:00Z"
 }
 ```

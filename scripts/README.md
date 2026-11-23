@@ -141,6 +141,8 @@ inventory排除.git、_参考缓存和__pycache__；errors非空时必须核对�
 
 稳定输出为index.json、main_overview.jpg和detail_overview.jpg。索引记录路径、编号、排序、宽高、比例、内容哈希、fingerprint、总览路径及哈希；未变化复用，新增/删除/改名/替换仅更新受影响类别，总览损坏重建。空目录、坏图报错，不生成空尺寸报告；重复内容不去重，重复编号用duplicate_ids提示，必须核对后建立映射。
 
+缓存index使用schema_version=2：source_base=cache_directory，默认source=".."；categories.files.path相对套系、preview相对缓存目录。cache_location.path_base=suite，default与actual相对套系；仅跨盘符外置路径无法相对化时source_external/actual_external=true。临时清单和命令返回的source/cache仍可为当前绝对路径，不应据此手工覆盖持久索引。v1来源与当前套系不同的缓存，仅在清单指纹有效、全部已记录原图按相对路径存在且SHA-256一致时自动迁移，保留AI分析原文及指纹；不一致则报错且不覆盖旧索引，需核对映射，不自动猜另一套参考。
+
 工具不分析设计。AI完成原参考分析后另写main_analysis.json/detail_analysis.json，包含source_fingerprint（当前fingerprint）、rules_version（当前analysis_rules_version）及非空analysis。指纹或规则不匹配时analysis_required为true；规则变化只需重分析，不无故重拼总览。公共分析不代替每产品专属风格配色与文案。
 
 每类返回changes，逐张列added、removed、modified、unchanged（原图相对路径），sequence_changed说明文件顺序清单有变；改名按删除加新增处理。changes对比上次扫描，analysis_changes对比有效AI分析所依据的原图，分析未完成时重复扫描不会清空待办。analysis_scope为none时复用，为incremental时只处理变化图片及受影响结论；为full时表示首次分析、规则改变或有效分析依据缺失，需重新建立该类基础分析。仅总览损坏不会触发原图重分析。
@@ -163,4 +165,20 @@ AI分析文件仍使用source_fingerprint、rules_version、analysis。新分析
 {"root":"<参考库绝对路径>","sets":[{"suite":"水果/套系01","categories":{"main":"主图","detail":"详情图"},"analysis_rules_version":"1"}]}
 ```
 
-前置全库任务的sets列出枚举到的全部套系，普通制作可仅列候选但不能声称覆盖全库。工具逐套复用reference_cache检查文件，再将有效分析汇总为根目录_公共参考中的选套索引.json及选套说明.md；不调用AI、不自动生成或修改分析。运行可先产出missing列表，AI批量完成所需分析后再汇总。类别状态ready/missing/stale/incomplete全部保留；出错停止、返回失败，不能把旧索引当本次成功结果。索引JSON为机器读取依据，说明文件仅供浏览；详细内容仍读取套系分析，哈希匹配不证明AI观察准确。
+全库前置（含完整制作中的前置）的sets列出枚举到的全部套系；定向操作可仅列候选但不能声称覆盖全库。工具逐套复用reference_cache检查文件，再将有效分析汇总为根目录_公共参考中的选套索引.json及选套说明.md；不调用AI、不自动生成或修改分析。运行可先产出missing列表，AI批量完成所需分析后再汇总。类别状态ready/missing/stale/incomplete全部保留；出错停止、返回失败，不能把旧索引当本次成功结果。索引JSON为机器读取依据，说明文件仅供浏览；详细内容仍读取套系分析，哈希匹配不证明AI观察准确。
+
+公共索引v2的source="."、path_base=reference_library；suite、cache、categories.*.analysis_file均相对当前参考库根目录，统一用/分隔。例：cache="水果/套系01/_参考缓存"，analysis_file="水果/套系01/_参考缓存/main_analysis.json"。读取时以_公共参考上一级为根，不以进程cwd为根。若cache_external/analysis_file_external=true，须按标记解析外部路径并披露不可单独搬库；其余相对路径也可能指向库外缓存，迁移时须同时保持相对关系。build不沿用旧公共索引的绝对地址，始终从清单指定的当前根与缓存重建v2公共索引。仅检查不更新时不要运行build/prepare，它们会写缓存；只读核验后在授权更新时迁移。
+
+## 项目与模板索引路径迁移
+
+入口：`python index_paths.py "路径迁移清单.json"`。这是定向字段迁移，不自动发现或重写所有JSON，不生成/复制图片。执行者先枚举实际引用字段、确认文件基准和外部依赖，再填写清单；不要把业务文案、历史调用或检测报告当资源索引字段选入。
+
+```json
+{"apply":false,"mappings":[{"from":"<旧项目绝对根>","to":"<当前项目绝对根>"}],"documents":[{"base":"<当前项目绝对根>","file":"project.json","fields":[{"pointer":"/products/0/index"},{"pointer":"/inputs/products"}]}]}
+```
+
+默认apply=false只检查、返回拟修改内容，授权后改true再运行。base为当前索引的资源基准，file相对base且必须为现有JSON；项目/产品/执行卡统一用项目根，模板用模板根。fields只处理列出的JSON Pointer（数组用数字，键中的/写~1、~写~0）；旧相对路径如不以当前base为准，可在该field写from_base为明确旧绝对基准，再通过mappings定位。映射按完整目录边界、最长匹配解析，支持Windows及POSIX旧路径，不进行字符串全局替换。产品selected、delivered_from等同义引用须一起列出，不能只迁一处；新schema标记及索引语义仍由执行者按流程核对维护。
+
+全部文档先预检再写；内部结果统一相对base，越界依赖只有field显式external=true才允许保留为当前绝对外部路径，并返回external状态。目标必须存在；field指向带sha256的path/file时校验证据，不绕过其他业务状态或语义校验。模板应列shell/path、example/path、cache、slots、report等实际字段；执行卡应列source_images及逐job.references等；可选字段不存在不要写入清单。每份JSON写前加锁并核对旧哈希、原子替换；写入阶段失败可能已有部分成功，按实际文件恢复，不承诺跨文件事务回滚。工具不修改Markdown快照、不改状态、不删除旧文件；真实迁移完后须复查索引引用关系及可读性。
+
+历史提示词不使用本工具改写，改用prompt_builder.py的--project-root和--path-map仅在读取时映射、逐图校验指纹，详见产品保真组装说明。环境记录的旧解释器路径应在换机后重新检查，不简单替换为当前机器路径。

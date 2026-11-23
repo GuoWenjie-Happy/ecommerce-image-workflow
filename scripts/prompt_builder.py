@@ -371,6 +371,7 @@ def build(root, spec):
         path = image_path(root, source)
         source_records.append({
             'path': str(path),
+            **({'project_path': path.relative_to(root).as_posix()} if path.is_relative_to(root) else {}),
             'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
     fields = identity['fields']
     if not isinstance(fields, dict) or set(fields) != set(FIELDS):
@@ -474,6 +475,7 @@ def build(root, spec):
         'source_evidence': source_records,
         'reference_evidence': [
             {'path': name,
+             **({'project_path': Path(name).relative_to(root).as_posix()} if Path(name).is_relative_to(root) else {}),
              'sha256': hashlib.sha256(Path(name).read_bytes()).hexdigest()}
             for name in images],
         'prompt_sha256': hashlib.sha256(prompt.encode('utf-8')).hexdigest(),
@@ -485,7 +487,7 @@ def build(root, spec):
     }
 
 
-def load_request(path):
+def load_request(path, project_root=None, path_mappings=None):
     content = path.read_text(encoding='utf-8')
     before, separator, prompt = content.partition('\n\n## 完整提示词原文\n\n')
     if not separator:
@@ -511,14 +513,28 @@ def load_request(path):
         if metadata['policy_sha256'] != hashlib.sha256(fixed.encode('utf-8')).hexdigest():
             raise ValueError(
                 'Archived preservation file changed; explicitly recompose before new generation')
+    from index_paths import remap
+    current_root = Path(project_root).resolve(strict=True) if project_root is not None else None
+    resolved_paths = {}
     for item in metadata['source_evidence'] + metadata['reference_evidence']:
-        if hashlib.sha256(Path(item['path']).read_bytes()).hexdigest() != item['sha256']:
+        if current_root is not None and 'project_path' in item:
+            resolved = (current_root/item['project_path']).resolve(strict=True)
+            if not resolved.is_relative_to(current_root):
+                raise ValueError('Archived relative evidence escapes project')
+        else:
+            resolved = remap(item['path'], path_mappings or []).resolve(strict=True)
+        if hashlib.sha256(resolved.read_bytes()).hexdigest() != item['sha256']:
             raise ValueError('Source product evidence changed; recheck identity before generation')
+        resolved_paths[item['path']] = str(resolved)
     reject_credentials(metadata['parameters'])
     for image in metadata['parameters']['referenced_image_paths']:
-        with Image.open(image) as reference:
+        if image not in resolved_paths:
+            raise ValueError('Attached image lacks verified evidence')
+        with Image.open(resolved_paths[image]) as reference:
             reference.verify()
-    return {'prompt': prompt, **metadata['parameters']}
+    parameters = dict(metadata['parameters'])
+    parameters['referenced_image_paths'] = [resolved_paths[name] for name in parameters['referenced_image_paths']]
+    return {'prompt': prompt, **parameters}
 
 
 if __name__ == '__main__':
@@ -528,9 +544,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Read and validate an assembled host image request; does not send it.')
     parser.add_argument('snapshot', type=Path)
+    parser.add_argument('--project-root', type=Path)
+    parser.add_argument('--path-map', type=Path, help='JSON with explicit old/current root mappings')
     args = parser.parse_args()
     try:
-        print(json.dumps(load_request(args.snapshot), ensure_ascii=False))
+        mappings = json.loads(args.path_map.read_text(encoding='utf-8-sig'))['mappings'] if args.path_map else []
+        print(json.dumps(load_request(args.snapshot, args.project_root, mappings), ensure_ascii=False))
     except (ValueError, OSError, KeyError, TypeError, IndexError) as exc:
         print(f'ERROR: {exc}', file=sys.stderr)
         sys.exit(1)
